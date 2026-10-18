@@ -1,0 +1,2433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>简约聊天</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --border: #eceef1;
+    --text: #1f2329;
+    --text-secondary: #8a9099;
+    --accent: #3b82f6;
+    --header-height: 52px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top: env(safe-area-inset-top, 0px);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; width: 100%; overflow: hidden; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    background: #000;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    width: 100%;
+    background: var(--bg);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .view {
+    display: none;
+    flex: 1 1 auto;
+    min-height: 0;
+    flex-direction: column;
+    width: 100%;
+  }
+  .view.active { display: flex; }
+
+  .header {
+    flex: 0 0 var(--header-height);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .header .title { font-size: 17px; font-weight: 600; }
+
+  .icon-btn {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px; height: 32px;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    border-radius: 8px;
+  }
+  .icon-btn:active { opacity: 0.6; }
+  .icon-btn svg { width: 22px; height: 22px; }
+  .icon-btn.right { left: auto; right: 12px; }
+
+  /* 聊天页顶栏 */
+  .header.chat-header {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 80px;
+    padding: 12px 0;
+    background: #eef1f5;
+  }
+  .header-actions {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .header-actions .icon-btn {
+    position: static;
+    transform: none;
+    width: 34px; height: 34px;
+  }
+  .header-actions .icon-btn svg { width: 21px; height: 21px; }
+
+  .header-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+  }
+  .header-grid {
+    display: grid;
+    grid-template-columns: auto 42px auto;
+    align-items: center;
+    justify-items: center;
+    row-gap: 5px;
+  }
+  .header-avatar {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 15px; font-weight: 600;
+    user-select: none;
+  }
+  #h-avatar-them { pointer-events: auto; cursor: pointer; }
+  #h-avatar-them:active { opacity: 0.7; }
+  .header-link {
+    width: 30px; height: 3px;
+    background: #fff;
+    border-radius: 2px;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.18);
+  }
+  .header-name {
+    font-size: 12px; color: var(--text); font-weight: 500;
+    white-space: nowrap; max-width: 56px; overflow: hidden; text-overflow: ellipsis;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #c3c7ce; flex: 0 0 auto;
+  }
+  .status-dot.online {
+    background: #22c55e;
+    box-shadow: 0 0 6px 2px rgba(34, 197, 94, 0.75);
+    animation: statusPulse 1.8s ease-in-out infinite;
+  }
+  @keyframes statusPulse {
+    0%, 100% { box-shadow: 0 0 4px 1px rgba(34, 197, 94, 0.55); }
+    50% { box-shadow: 0 0 9px 3px rgba(34, 197, 94, 0.95); }
+  }
+
+  /* 消息区 */
+  .chat-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 16px 14px 20px;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background: var(--bg);
+  }
+
+  .msg-row { display: flex; align-items: flex-end; gap: 8px; max-width: 82%; }
+  .msg-row.in { align-self: flex-start; }
+  .msg-row.out { align-self: flex-end; flex-direction: row-reverse; }
+
+  .avatar {
+    flex: 0 0 auto;
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    user-select: none;
+  }
+
+  .avatar-col {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .avatar-status {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 9.5px;
+    color: #a0a5ac;
+    white-space: nowrap;
+  }
+  .avatar-status .status-dot { width: 6px; height: 6px; }
+
+  .bubble {
+    padding: 9px 13px;
+    border-radius: 16px;
+    font-size: 14.5px;
+    line-height: 1.5;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  .msg-row.in .bubble { background: #ffffff; border-top-left-radius: 4px; }
+  .msg-row.out .bubble { background: var(--accent); color: #fff; border-top-right-radius: 4px; }
+
+  .bubble-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    min-width: 0;
+  }
+  .msg-row.in .msg-time { align-self: flex-end; }
+  .msg-row.out .msg-time { align-self: flex-start; }
+  .msg-time {
+    font-size: 10.5px; color: #a0a5ac;
+    line-height: 1; white-space: nowrap; padding: 0 4px;
+  }
+
+  /* 通话记录等系统提示消息 */
+  .sys-msg {
+    align-self: center;
+    font-size: 12.5px;
+    color: #8a9099;
+    background: rgba(0, 0, 0, 0.04);
+    padding: 4px 12px;
+    border-radius: 6px;
+    max-width: 86%;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  /* 消息引用 + 撤回 */
+  .msg-row { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .quote-ref {
+    max-width: 220px;
+    font-size: 12px;
+    color: #8a9099;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin-bottom: 6px;
+    line-height: 1.4;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .msg-row.out .quote-ref { color: rgba(255, 255, 255, 0.85); background: rgba(255, 255, 255, 0.16); }
+
+  .msg-menu {
+    position: fixed;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+    padding: 6px;
+    z-index: 610;
+    display: none;
+    flex-direction: row;
+    gap: 2px;
+  }
+  .msg-menu.show { display: flex; }
+  .msg-menu-item {
+    display: flex; align-items: center; gap: 6px;
+    border: none; background: transparent;
+    padding: 10px 14px; font-size: 14px; color: var(--text);
+    border-radius: 8px; cursor: pointer; white-space: nowrap;
+  }
+  .msg-menu-item:active { background: #f1f3f5; }
+  .msg-menu-item svg { width: 16px; height: 16px; color: #5b616a; }
+
+  .quote-bar {
+    flex: 0 0 auto;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #eef1f5;
+    border-top: 1px solid var(--border);
+  }
+  .quote-bar.show { display: flex; }
+  .quote-bar-text {
+    flex: 1 1 auto; min-width: 0;
+    font-size: 13px; color: var(--text-secondary);
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  }
+  .quote-bar-close {
+    flex: 0 0 auto;
+    width: 22px; height: 22px; border: none; border-radius: 50%;
+    background: #d3d7dd; color: #fff; font-size: 15px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .quote-bar-close:active { opacity: 0.7; }
+
+  /* 输入栏 */
+  .composer {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    padding-bottom: calc(8px + var(--safe-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  .input-wrap {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    background: var(--bg);
+    border-radius: 20px;
+    padding: 0 14px;
+    height: 38px;
+  }
+  .input-wrap input {
+    flex: 1 1 auto;
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 14.5px;
+    color: var(--text);
+    height: 100%;
+    min-width: 0;
+  }
+  .input-wrap input::placeholder { color: #b3b8bf; }
+
+  .send-btn {
+    flex: 0 0 auto;
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .send-btn:active { opacity: 0.8; }
+  .send-btn svg { width: 18px; height: 18px; }
+
+  /* ===================== 黑色连接页 ===================== */
+  .profile-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #000;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .profile-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform: translateY(-30px);
+  }
+
+  .connect-row { display: flex; align-items: flex-start; gap: 14px; }
+
+  .person { display: flex; flex-direction: column; align-items: center; }
+  .person .avatar { width: 72px; height: 72px; border-radius: 50%; font-size: 28px; }
+  .person-name { margin-top: 14px; color: #fff; font-size: 15px; }
+
+  .heart-box { height: 72px; display: flex; align-items: center; }
+  .heart-connect { width: 150px; height: 64px; display: block; }
+
+  .wire {
+    fill: none;
+    stroke: #ff4d4f;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 5px rgba(255, 77, 79, 0.5));
+  }
+  .energy {
+    fill: #ff8a8a;
+    filter: drop-shadow(0 0 4px rgba(255, 90, 90, 0.9));
+  }
+  .heart {
+    fill: none;
+    stroke: #ff4d4f;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 8px rgba(255, 77, 79, 0.55));
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: heartbeat 1.4s ease-in-out infinite;
+  }
+  @keyframes heartbeat {
+    0%, 100% { transform: scale(1); }
+    14% { transform: scale(1.12); }
+    28% { transform: scale(1); }
+    42% { transform: scale(1.06); }
+    56% { transform: scale(1); }
+  }
+
+  .profile-actions { display: flex; gap: 12px; margin-top: 40px; flex-wrap: wrap; justify-content: center; }
+  .btn-chat, .btn-moments {
+    min-width: 96px; height: 44px;
+    padding: 0 18px;
+    border-radius: 22px;
+    font-size: 15px; font-weight: 500;
+    cursor: pointer;
+  }
+  .btn-chat { background: #fff; color: #111; border: none; }
+  .btn-chat:active { opacity: 0.85; }
+  .btn-moments { background: #fff; color: #111; border: none; }
+  .btn-moments:active { opacity: 0.85; }
+
+  /* ===================== 朋友圈 ===================== */
+  .moments-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    background: var(--bg);
+    padding: 14px 14px 20px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .moment {
+    display: flex;
+    gap: 12px;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .moment:last-child { border-bottom: none; margin-bottom: 0; }
+  .moment-avatar { width: 44px; height: 44px; border-radius: 10px; font-size: 17px; }
+  .moment-main { flex: 1 1 auto; min-width: 0; }
+  .moment-name { font-size: 15.5px; font-weight: 600; color: #576b95; }
+  .moment-text { margin-top: 6px; font-size: 15px; line-height: 1.5; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+  .moment-foot { margin-top: 8px; display: flex; align-items: center; }
+  .moment-time { font-size: 12.5px; color: var(--text-secondary); }
+  .moment-actions { margin-left: auto; display: flex; gap: 2px; }
+  .moment-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .moment-action:active { background: #eef0f3; }
+  .moment-action.liked { color: var(--accent); }
+  .moment-action svg { width: 15px; height: 15px; }
+
+  .interactions {
+    margin-top: 10px;
+    background: #f1f3f5;
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: none;
+  }
+  .interactions.has { display: block; }
+  .like-row { display: flex; align-items: flex-start; gap: 6px; font-size: 13.5px; color: var(--text); line-height: 1.5; }
+  .like-row svg { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 2px; color: var(--accent); }
+  .like-names { word-break: break-word; }
+  .like-row + .comment-row { margin-top: 6px; padding-top: 6px; border-top: 1px solid #e3e6ea; }
+  .comment-row { font-size: 13.5px; color: var(--text); line-height: 1.5; word-break: break-word; }
+  .comment-row + .comment-row { margin-top: 4px; }
+  .comment-row .c-name { color: #576b95; margin-right: 6px; }
+
+  .comment-composer { margin-top: 8px; display: flex; align-items: center; gap: 6px; }
+  .comment-composer input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 32px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: #fff;
+    padding: 0 12px;
+    font-size: 13.5px;
+    outline: none;
+    color: var(--text);
+  }
+  .comment-send {
+    flex: 0 0 auto;
+    height: 32px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 16px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  /* 发表动态弹窗 */
+  .compose-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 300;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .compose-overlay.show { display: flex; }
+  .compose-card {
+    width: 100%;
+    max-width: 340px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .compose-title { font-size: 16px; font-weight: 600; text-align: center; }
+  .compose-card textarea {
+    width: 100%;
+    height: 110px;
+    resize: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 14px;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+  }
+  .compose-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .compose-actions button { height: 34px; padding: 0 18px; border-radius: 17px; border: none; font-size: 14px; cursor: pointer; }
+  .compose-cancel { background: #f1f3f5; color: var(--text); }
+  .compose-publish { background: var(--accent); color: #fff; }
+
+  /* ===================== 三点菜单 ===================== */
+  .menu-pop {
+    position: fixed;
+    top: 58px; right: 12px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+    padding: 6px;
+    z-index: 500;
+    display: none;
+    flex-direction: column;
+    min-width: 156px;
+  }
+  .menu-pop.show { display: flex; }
+  .menu-item {
+    display: flex; align-items: center; gap: 10px;
+    border: none; background: transparent;
+    padding: 11px 12px; font-size: 14px; color: var(--text);
+    border-radius: 8px; cursor: pointer; text-align: left;
+  }
+  .menu-item:active { background: #f1f3f5; }
+  .menu-item svg { width: 18px; height: 18px; color: #5b616a; }
+
+  /* ===================== 选择弹窗（头像/背景） ===================== */
+  .picker-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 600;
+    display: none; align-items: center; justify-content: center; padding: 24px;
+  }
+  .picker-overlay.show { display: flex; }
+  .picker-card {
+    width: 100%; max-width: 340px;
+    background: #fff; border-radius: 12px; padding: 18px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .picker-title { font-size: 16px; font-weight: 600; text-align: center; }
+  .picker-actions { display: flex; gap: 10px; justify-content: center; }
+  .wc-preview-summary { font-size: 13px; color: var(--text-secondary); text-align: center; }
+  .wc-preview-list {
+    max-height: 260px; overflow-y: auto; border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .wc-preview-item { font-size: 13px; line-height: 1.5; word-break: break-word; white-space: pre-wrap; }
+  .wc-preview-more { font-size: 12px; color: var(--text-secondary); text-align: center; margin-top: 6px; }
+  .picker-actions button { height: 36px; padding: 0 20px; border-radius: 18px; border: none; font-size: 14px; cursor: pointer; }
+  .wc-btn-cancel { background: #f1f3f5; color: var(--text); }
+  .wc-btn-confirm { background: var(--accent); color: #fff; }
+
+  /* ===================== 设置 / 字卡 ===================== */
+  .settings-scroll {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    background: var(--bg); padding: 16px 14px 24px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .settings-section {
+    background: var(--surface); border-radius: 12px; padding: 4px 16px;
+  }
+  .settings-row {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; background: transparent; border: none; cursor: pointer;
+    padding: 16px 0; font-size: 16px; color: var(--text); text-align: left;
+  }
+  .settings-row:active { opacity: 0.6; }
+  .settings-row-arrow { width: 18px; height: 18px; color: var(--text-secondary); flex: 0 0 auto; }
+
+  .wc-toolbar {
+    flex: 0 0 auto;
+    display: flex; gap: 8px; flex-wrap: wrap;
+    padding: 12px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .wc-tool-btn {
+    height: 32px; padding: 0 14px; border-radius: 16px; border: 1px solid var(--border);
+    background: #f1f3f5; color: var(--text); font-size: 13px; cursor: pointer;
+  }
+  .wc-tool-btn:active { opacity: 0.7; }
+  .wc-tool-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .wc-scroll {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    background: var(--bg); padding: 14px 14px 90px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .wc-empty { font-size: 13px; color: var(--text-secondary); text-align: center; padding: 30px 0; }
+
+  .wc-group {
+    background: var(--surface); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px;
+  }
+  .wc-group-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 2px;
+  }
+  .wc-group-name { font-size: 15px; font-weight: 600; }
+  .wc-group-count { font-size: 12px; color: var(--text-secondary); }
+
+  .wc-card {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 0; border-bottom: 1px solid var(--border);
+  }
+  .wc-card:last-child { border-bottom: none; }
+  .wc-card-check {
+    display: none; width: 21px; height: 21px; flex: 0 0 auto;
+    border-radius: 50%; border: 2px solid #c3c7ce; background: #fff;
+    cursor: pointer; align-items: center; justify-content: center;
+  }
+  .wc-card-check.checked { background: var(--accent); border-color: var(--accent); }
+  .wc-card-check.checked::after {
+    content: ""; width: 7px; height: 4px;
+    border-left: 2px solid #fff; border-bottom: 2px solid #fff;
+    transform: rotate(-45deg) translate(-0.5px, -0.5px);
+  }
+  .wc-card.check-mode .wc-card-check { display: inline-flex; }
+  .wc-card-text { flex: 1 1 auto; font-size: 14px; line-height: 1.5; word-break: break-word; white-space: pre-wrap; }
+
+  /* 管理分组弹窗 */
+  .gc-pop {
+    position: absolute; top: calc(100% + 4px); right: 14px;
+    background: #fff; border-radius: 12px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+    padding: 8px; z-index: 620; display: none; flex-direction: column; min-width: 172px;
+  }
+  .gc-pop.show { display: flex; }
+  .gc-item {
+    display: flex; align-items: center; gap: 10px;
+    border: none; background: transparent; padding: 13px 14px;
+    font-size: 15px; color: var(--text); border-radius: 8px; cursor: pointer; text-align: left;
+  }
+  .gc-item:active { background: #f1f3f5; }
+  .gc-item svg { width: 18px; height: 18px; color: #5b616a; }
+
+  .wc-dialog-input {
+    width: 100%; height: 40px; border: 1px solid var(--border); border-radius: 8px;
+    padding: 0 12px; font-size: 14px; outline: none; color: var(--text);
+  }
+  .wc-dialog-textarea {
+    width: 100%; height: 140px; resize: none; border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px; font-size: 14px; outline: none; color: var(--text); font-family: inherit;
+  }
+  .wc-move-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; }
+
+  /* 批量管理底栏 */
+  .wc-batchbar {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 10px 14px calc(10px + var(--safe-bottom));
+    display: none; align-items: center; gap: 10px; z-index: 450;
+  }
+  .wc-batchbar.show { display: flex; }
+  .wc-batch-info { flex: 1 1 auto; font-size: 13px; color: var(--text-secondary); }
+  .wc-batchbar button {
+    height: 34px; padding: 0 14px; border-radius: 17px; border: none; font-size: 13px; cursor: pointer;
+  }
+  .wc-batch-move { background: #f1f3f5; color: var(--text); }
+  .wc-batch-del { background: #f43f5e; color: #fff; }
+  .wc-batch-done { background: var(--accent); color: #fff; }
+
+  /* ===================== 通话 ===================== */
+  .call-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 400;
+    background: linear-gradient(180deg, #151a2b, #0a0d16);
+    color: #fff;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 70px 24px 50px;
+  }
+  .call-overlay.show { display: flex; }
+  .call-overlay.video { background: linear-gradient(180deg, #0b1526, #050a14); }
+
+  .call-minimize {
+    position: absolute; top: calc(18px + var(--safe-top)); left: 16px;
+    width: 42px; height: 42px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14); color: #fff; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .call-minimize:active { opacity: 0.7; }
+  .call-minimize svg { width: 20px; height: 20px; }
+
+  .call-body { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .call-avatar {
+    width: 92px; height: 92px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 38px; font-weight: 600;
+  }
+  .call-name { font-size: 21px; font-weight: 600; }
+  .call-status { font-size: 15px; color: rgba(255, 255, 255, 0.85); }
+  .call-timer { font-size: 16px; color: rgba(255, 255, 255, 0.7); font-variant-numeric: tabular-nums; }
+
+  .call-actions { margin-top: 40px; display: flex; gap: 24px; }
+  .call-btn {
+    width: 62px; height: 62px; border-radius: 50%; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+  }
+  .call-btn:active { opacity: 0.8; }
+  .call-btn.hangup { background: #f43f5e; }
+  .call-btn svg { width: 28px; height: 28px; }
+  .call-btn.hangup svg { transform: rotate(135deg); }
+
+  /* 来电界面（全屏） */
+  .incoming-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 410;
+    background: linear-gradient(180deg, #151a2b, #0a0d16);
+    color: #fff;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 70px 24px 50px;
+  }
+  .incoming-overlay.show { display: flex; }
+
+  .incoming-actions { margin-top: 48px; display: flex; gap: 60px; align-items: flex-end; }
+  .in-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    background: transparent; border: none; cursor: pointer; color: #fff; font-size: 13px;
+  }
+  .in-btn:active { opacity: 0.8; }
+  .in-btn .circle {
+    width: 70px; height: 70px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .in-btn.decline .circle { background: #f43f5e; }
+  .in-btn.accept .circle { background: #22c55e; }
+  .in-btn svg { width: 32px; height: 32px; }
+  .in-btn.decline svg { transform: rotate(135deg); }
+
+  /* 悬浮小窗（可拖动） */
+  .call-float {
+    position: fixed;
+    z-index: 450;
+    width: 172px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28);
+    padding: 12px;
+    display: none;
+    flex-direction: column;
+    gap: 11px;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    top: 108px; right: 16px;
+  }
+  .call-float.show { display: flex; }
+  .call-float.dragging { cursor: grabbing; }
+  .float-main { display: flex; align-items: center; gap: 10px; }
+  .float-avatar {
+    width: 40px; height: 40px; border-radius: 50%; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 16px; flex: 0 0 auto;
+  }
+  .float-info { min-width: 0; }
+  .float-name { font-size: 13.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .float-status { font-size: 11.5px; color: #7a8089; white-space: nowrap; }
+  .float-btns { display: flex; gap: 10px; }
+  .float-btn {
+    flex: 1; height: 30px; border-radius: 15px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .float-btn:active { opacity: 0.8; }
+  .float-expand { background: #f1f3f5; color: var(--text); }
+  .float-hangup { background: #f43f5e; color: #fff; }
+  .float-btn svg { width: 16px; height: 16px; }
+  .float-hangup svg { transform: rotate(135deg); }
+</style>
+</head>
+<body>
+
+<!-- ===================== 聊天对话框 ===================== -->
+<div class="app">
+  <div class="view" id="view-chat">
+    <header class="header chat-header">
+      <button class="icon-btn" id="btn-back" aria-label="返回">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+
+      <div class="header-center">
+        <div class="header-grid">
+          <div class="header-avatar" id="h-avatar-them"></div>
+          <div class="header-link"></div>
+          <div class="header-avatar" id="h-avatar-me"></div>
+          <div class="header-name" id="h-name-them"></div>
+          <div></div>
+          <div class="header-name" id="h-name-me"></div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button class="icon-btn" id="btn-call" aria-label="电话">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        </button>
+        <button class="icon-btn" id="btn-more" aria-label="更多">
+          <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+        </button>
+      </div>
+    </header>
+    <div class="chat-scroll" id="chat-scroll"></div>
+    <div class="quote-bar" id="quote-bar">
+      <span class="quote-bar-text" id="quote-bar-text"></span>
+      <button class="quote-bar-close" id="quote-bar-close" aria-label="取消引用">×</button>
+    </div>
+    <div class="composer">
+      <div class="input-wrap">
+        <input type="text" id="message-input" placeholder="输入消息..." autocomplete="off" maxlength="500">
+      </div>
+      <button class="send-btn" id="send-btn" aria-label="发送">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="view" id="view-moments">
+    <header class="header">
+      <button class="icon-btn" id="moments-back" aria-label="返回">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="title">朋友圈</div>
+      <button class="icon-btn right" id="btn-publish" aria-label="发表动态">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </button>
+    </header>
+    <div class="moments-scroll" id="moments-scroll"></div>
+  </div>
+
+  <div class="view" id="view-settings">
+    <header class="header">
+      <button class="icon-btn" id="settings-back" aria-label="返回">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="title">设置</div>
+    </header>
+    <div class="settings-scroll">
+      <div class="settings-section">
+        <button class="settings-row" id="btn-wordcards">
+          <span>字卡</span>
+          <svg class="settings-row-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="view-wordcards">
+    <header class="header">
+      <button class="icon-btn" id="wordcards-back" aria-label="返回">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="title">字卡</div>
+      <button class="icon-btn right" id="wc-add-btn" aria-label="添加字卡">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </header>
+    <div class="wc-toolbar">
+      <button class="wc-tool-btn" id="wc-import-json">导入 JSON</button>
+      <button class="wc-tool-btn" id="wc-import-text">导入文档</button>
+      <button class="wc-tool-btn" id="wc-export">导出</button>
+      <button class="wc-tool-btn" id="wc-manage-group">管理分组</button>
+      <div class="gc-pop" id="gc-pop">
+        <button class="gc-item" id="gc-new-group">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          <span>新建分组</span>
+        </button>
+        <button class="gc-item" id="gc-batch">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span>批量管理</span>
+        </button>
+      </div>
+    </div>
+    <div class="wc-scroll" id="wc-scroll"></div>
+  </div>
+</div>
+
+<!-- ===================== 黑色连接页（首页） ===================== -->
+<div class="profile-overlay" id="profile-overlay">
+  <div class="profile-inner">
+    <div class="connect-row">
+      <div class="person">
+        <div class="avatar" id="p-avatar-them"></div>
+        <div class="person-name" id="p-name-them"></div>
+      </div>
+      <div class="heart-box">
+        <svg class="heart-connect" viewBox="0 0 180 64" aria-hidden="true">
+          <line class="wire" x1="2" y1="32" x2="74" y2="32"/>
+          <line class="wire" x1="106" y1="32" x2="178" y2="32"/>
+          <circle class="energy" r="2.6">
+            <animateMotion dur="1.4s" repeatCount="indefinite" path="M2 32 L74 32"/>
+          </circle>
+          <circle class="energy" r="2.6">
+            <animateMotion dur="1.4s" repeatCount="indefinite" begin="0.7s" path="M2 32 L74 32"/>
+          </circle>
+          <circle class="energy" r="2.6">
+            <animateMotion dur="1.4s" repeatCount="indefinite" path="M178 32 L106 32"/>
+          </circle>
+          <circle class="energy" r="2.6">
+            <animateMotion dur="1.4s" repeatCount="indefinite" begin="0.7s" path="M178 32 L106 32"/>
+          </circle>
+          <g transform="translate(78,20)">
+            <path class="heart" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            <circle class="energy" r="2">
+              <animateMotion dur="2.6s" repeatCount="indefinite" path="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </circle>
+          </g>
+        </svg>
+      </div>
+      <div class="person">
+        <div class="avatar" id="p-avatar-me"></div>
+        <div class="person-name" id="p-name-me"></div>
+      </div>
+    </div>
+    <div class="profile-actions">
+      <button class="btn-chat" id="btn-chat">聊天</button>
+      <button class="btn-chat" id="btn-settings">设置</button>
+      <button class="btn-moments" id="btn-moments">朋友圈</button>
+    </div>
+  </div>
+</div>
+
+<div class="compose-overlay" id="compose-overlay">
+  <div class="compose-card">
+    <div class="compose-title">发表动态</div>
+    <textarea id="compose-text" placeholder="这一刻的想法..." maxlength="500"></textarea>
+    <div class="compose-actions">
+      <button class="compose-cancel" id="compose-cancel">取消</button>
+      <button class="compose-publish" id="compose-publish">发表</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 三点菜单 ===================== -->
+<div class="menu-pop" id="menu-pop">
+  <button class="menu-item" id="menu-background">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+    <span>更换聊天背景</span>
+  </button>
+</div>
+
+<div class="menu-pop" id="call-menu">
+  <button class="menu-item" id="call-voice-opt">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    <span>语音电话</span>
+  </button>
+  <button class="menu-item" id="call-video-opt">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+    <span>视频电话</span>
+  </button>
+</div>
+
+<!-- ===================== 消息操作菜单（引用 / 撤回） ===================== -->
+<div class="msg-menu" id="msg-menu">
+  <button class="msg-menu-item" id="msg-quote-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+    <span>引用</span>
+  </button>
+  <button class="msg-menu-item" id="msg-revoke-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+    <span>撤回</span>
+  </button>
+</div>
+
+<!-- 隐藏的本地文件输入（头像 / 背景 / 字卡） -->
+<input type="file" id="avatar-file" accept="image/*" hidden>
+<input type="file" id="bg-file" accept="image/*" hidden>
+<input type="file" id="wc-json-file" accept=".json,application/json" hidden>
+<input type="file" id="wc-text-file" accept=".txt,.md,text/plain" hidden>
+
+<!-- ===================== 字卡导入预览 ===================== -->
+<div class="picker-overlay" id="wc-preview-overlay">
+  <div class="picker-card">
+    <div class="picker-title">导入预览</div>
+    <div class="wc-preview-summary" id="wc-preview-summary"></div>
+    <div class="wc-preview-list" id="wc-preview-list"></div>
+    <div class="picker-actions">
+      <button class="wc-btn-cancel" id="wc-preview-cancel">取消</button>
+      <button class="wc-btn-confirm" id="wc-preview-confirm">确认导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 添加字卡 ===================== -->
+<div class="picker-overlay" id="wc-add-overlay">
+  <div class="picker-card">
+    <div class="picker-title">添加字卡</div>
+    <textarea class="wc-dialog-textarea" id="wc-add-text" placeholder="一行一个字卡"></textarea>
+    <div class="picker-actions">
+      <button class="wc-btn-cancel" id="wc-add-cancel">取消</button>
+      <button class="wc-btn-confirm" id="wc-add-confirm">添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 新建分组 ===================== -->
+<div class="picker-overlay" id="wc-group-overlay">
+  <div class="picker-card">
+    <div class="picker-title">新建分组</div>
+    <input type="text" class="wc-dialog-input" id="wc-group-name" placeholder="分组名称" maxlength="20" autocomplete="off">
+    <div class="picker-actions">
+      <button class="wc-btn-cancel" id="wc-group-cancel">取消</button>
+      <button class="wc-btn-confirm" id="wc-group-confirm">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 移入分组 ===================== -->
+<div class="picker-overlay" id="wc-move-overlay">
+  <div class="picker-card">
+    <div class="picker-title">移入分组</div>
+    <div class="wc-move-list" id="wc-move-list"></div>
+    <div class="picker-actions">
+      <button class="wc-btn-cancel" id="wc-move-cancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 批量管理底栏 ===================== -->
+<div class="wc-batchbar" id="wc-batch-bar">
+  <span class="wc-batch-info" id="wc-batch-info">已选 0 项</span>
+  <button class="wc-batch-move" id="wc-batch-move">移入分组</button>
+  <button class="wc-batch-del" id="wc-batch-del">删除</button>
+  <button class="wc-batch-done" id="wc-batch-done">完成</button>
+</div>
+
+<!-- ===================== 通话界面 ===================== -->
+<div class="call-overlay" id="call-overlay">
+  <button class="call-minimize" id="call-minimize" aria-label="最小化">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+  <div class="call-body">
+    <div class="call-avatar" id="call-avatar"></div>
+    <div class="call-name" id="call-name"></div>
+    <div class="call-status" id="call-status">正在呼叫...</div>
+    <div class="call-timer" id="call-timer"></div>
+  </div>
+  <div class="call-actions">
+    <button class="call-btn hangup" id="call-hangup" aria-label="挂断">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="incoming-overlay" id="incoming-overlay">
+  <div class="call-body">
+    <div class="call-avatar" id="in-avatar"></div>
+    <div class="call-name" id="in-name"></div>
+    <div class="call-status" id="in-status"></div>
+  </div>
+  <div class="incoming-actions">
+    <button class="in-btn decline" id="in-decline">
+      <span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
+      <span>挂断</span>
+    </button>
+    <button class="in-btn accept" id="in-accept">
+      <span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
+      <span>接听</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===================== 悬浮小窗 ===================== -->
+<div class="call-float" id="call-float">
+  <div class="float-main">
+    <div class="float-avatar" id="float-avatar"></div>
+    <div class="float-info">
+      <div class="float-name" id="float-name"></div>
+      <div class="float-status" id="float-status"></div>
+    </div>
+  </div>
+  <div class="float-btns">
+    <button class="float-btn float-expand" id="float-expand" aria-label="展开">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+    </button>
+    <button class="float-btn float-hangup" id="float-hangup" aria-label="挂断">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var MY_NAME = "阿泽";
+  var MY_COLOR = "#3b82f6";
+  var MY_STATUS = "在线";
+
+  var STATUSES = ["在线", "离线", "忙碌", "离开一下", "工作中", "休息中", "学习中", "吃饭中", "散步中", "勿扰模式"];
+
+  var contact = {
+    name: "林晓",
+    color: "#22c55e",
+    avatarUrl: "",
+    chatBg: "#f7f8fa",
+    chatBgImage: "",
+    status: "在线",
+    messages: [
+      { from: "them", text: "你好，最近怎么样", ts: Date.now() - 60000 },
+      { from: "me", text: "还不错，你呢", ts: Date.now() - 55000 },
+      { from: "them", text: "挺好的，有空聊聊", ts: Date.now() - 50000 }
+    ]
+  };
+
+  // ===== 元素 =====
+  var viewChat = document.getElementById("view-chat");
+  var chatScrollEl = document.getElementById("chat-scroll");
+  var messageInput = document.getElementById("message-input");
+  var sendBtn = document.getElementById("send-btn");
+  var btnBack = document.getElementById("btn-back");
+
+  var overlay = document.getElementById("profile-overlay");
+  var pAvatarThem = document.getElementById("p-avatar-them");
+  var pNameThem = document.getElementById("p-name-them");
+  var pAvatarMe = document.getElementById("p-avatar-me");
+  var pNameMe = document.getElementById("p-name-me");
+  var btnChat = document.getElementById("btn-chat");
+  var btnMoments = document.getElementById("btn-moments");
+
+  var viewMoments = document.getElementById("view-moments");
+  var momentsScrollEl = document.getElementById("moments-scroll");
+  var momentsBack = document.getElementById("moments-back");
+  var btnPublish = document.getElementById("btn-publish");
+  var composeOverlay = document.getElementById("compose-overlay");
+  var composeText = document.getElementById("compose-text");
+  var composeCancel = document.getElementById("compose-cancel");
+  var composePublish = document.getElementById("compose-publish");
+
+  var hAvatarThem = document.getElementById("h-avatar-them");
+  var hAvatarMe = document.getElementById("h-avatar-me");
+  var hNameThem = document.getElementById("h-name-them");
+  var hNameMe = document.getElementById("h-name-me");
+  var btnCall = document.getElementById("btn-call");
+  var btnMore = document.getElementById("btn-more");
+  var menuPop = document.getElementById("menu-pop");
+  var callMenu = document.getElementById("call-menu");
+  var callVoiceOpt = document.getElementById("call-voice-opt");
+  var callVideoOpt = document.getElementById("call-video-opt");
+  var menuBackground = document.getElementById("menu-background");
+  var avatarFile = document.getElementById("avatar-file");
+  var bgFile = document.getElementById("bg-file");
+
+  var viewSettings = document.getElementById("view-settings");
+  var settingsBack = document.getElementById("settings-back");
+  var btnSettings = document.getElementById("btn-settings");
+  var btnWordcards = document.getElementById("btn-wordcards");
+  var viewWordcards = document.getElementById("view-wordcards");
+  var wordcardsBack = document.getElementById("wordcards-back");
+  var wcAddBtn = document.getElementById("wc-add-btn");
+  var wcScroll = document.getElementById("wc-scroll");
+  var wcImportJsonBtn = document.getElementById("wc-import-json");
+  var wcImportTextBtn = document.getElementById("wc-import-text");
+  var wcExportBtn = document.getElementById("wc-export");
+  var wcManageGroupBtn = document.getElementById("wc-manage-group");
+  var gcPop = document.getElementById("gc-pop");
+  var gcNewGroup = document.getElementById("gc-new-group");
+  var gcBatch = document.getElementById("gc-batch");
+  var wcAddOverlay = document.getElementById("wc-add-overlay");
+  var wcAddText = document.getElementById("wc-add-text");
+  var wcAddCancel = document.getElementById("wc-add-cancel");
+  var wcAddConfirm = document.getElementById("wc-add-confirm");
+  var wcGroupOverlay = document.getElementById("wc-group-overlay");
+  var wcGroupNameInput = document.getElementById("wc-group-name");
+  var wcGroupCancel = document.getElementById("wc-group-cancel");
+  var wcGroupConfirm = document.getElementById("wc-group-confirm");
+  var wcMoveOverlay = document.getElementById("wc-move-overlay");
+  var wcMoveList = document.getElementById("wc-move-list");
+  var wcMoveCancel = document.getElementById("wc-move-cancel");
+  var wcBatchBar = document.getElementById("wc-batch-bar");
+  var wcBatchInfo = document.getElementById("wc-batch-info");
+  var wcBatchMove = document.getElementById("wc-batch-move");
+  var wcBatchDel = document.getElementById("wc-batch-del");
+  var wcBatchDone = document.getElementById("wc-batch-done");
+  var wcJsonFile = document.getElementById("wc-json-file");
+  var wcTextFile = document.getElementById("wc-text-file");
+  var wcPreviewOverlay = document.getElementById("wc-preview-overlay");
+  var wcPreviewSummary = document.getElementById("wc-preview-summary");
+  var wcPreviewList = document.getElementById("wc-preview-list");
+  var wcPreviewCancel = document.getElementById("wc-preview-cancel");
+  var wcPreviewConfirm = document.getElementById("wc-preview-confirm");
+
+  var callOverlay = document.getElementById("call-overlay");
+  var callMinimize = document.getElementById("call-minimize");
+  var callAvatar = document.getElementById("call-avatar");
+  var callName = document.getElementById("call-name");
+  var callStatus = document.getElementById("call-status");
+  var callTimerEl = document.getElementById("call-timer");
+  var callHangup = document.getElementById("call-hangup");
+
+  var incomingOverlay = document.getElementById("incoming-overlay");
+  var inAvatar = document.getElementById("in-avatar");
+  var inName = document.getElementById("in-name");
+  var inStatus = document.getElementById("in-status");
+  var inDecline = document.getElementById("in-decline");
+  var inAccept = document.getElementById("in-accept");
+
+  var callFloat = document.getElementById("call-float");
+  var floatAvatar = document.getElementById("float-avatar");
+  var floatName = document.getElementById("float-name");
+  var floatStatus = document.getElementById("float-status");
+  var floatExpand = document.getElementById("float-expand");
+  var floatHangup = document.getElementById("float-hangup");
+
+  var msgMenu = document.getElementById("msg-menu");
+  var msgQuoteBtn = document.getElementById("msg-quote-btn");
+  var msgRevokeBtn = document.getElementById("msg-revoke-btn");
+  var quoteBar = document.getElementById("quote-bar");
+  var quoteBarText = document.getElementById("quote-bar-text");
+  var quoteBarClose = document.getElementById("quote-bar-close");
+
+  // ===== 通用工具 =====
+  function initials(name) { return name.charAt(0); }
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function randomDelay(min, max) { return min + Math.random() * (max - min); }
+  function pad(n) { return n < 10 ? "0" + n : String(n); }
+  function formatDuration(s) { return pad(Math.floor(s / 60)) + ":" + pad(s % 60); }
+  function formatClock(ts) {
+    var d = new Date(ts);
+    return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  }
+
+  function formatTime(ts) {
+    var diff = Date.now() - ts;
+    var m = Math.floor(diff / 60000);
+    if (m < 1) return "刚刚";
+    if (m < 60) return m + "分钟前";
+    var h = Math.floor(m / 60);
+    if (h < 24) return h + "小时前";
+    var d = new Date(ts);
+    return (d.getMonth() + 1) + "月" + d.getDate() + "日";
+  }
+
+  // 渲染联系人头像（图片或首字）
+  function renderContactAvatar(el) {
+    if (contact.avatarUrl) {
+      el.innerHTML = '<img alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block">';
+      el.querySelector("img").src = contact.avatarUrl;
+      el.style.background = "#d8dce2";
+    } else {
+      el.innerHTML = "";
+      el.textContent = initials(contact.name);
+      el.style.background = contact.color;
+    }
+  }
+  function contactAvatarInner() {
+    return contact.avatarUrl
+      ? '<img alt="" src="' + contact.avatarUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block">'
+      : initials(contact.name);
+  }
+  function contactAvatarBg() {
+    return contact.avatarUrl ? "#d8dce2" : contact.color;
+  }
+  function applyChatBg() {
+    if (contact.chatBgImage) {
+      chatScrollEl.style.background = "";
+      chatScrollEl.style.backgroundImage = "url(" + contact.chatBgImage + ")";
+      chatScrollEl.style.backgroundSize = "cover";
+      chatScrollEl.style.backgroundPosition = "center";
+    } else {
+      chatScrollEl.style.backgroundImage = "none";
+      chatScrollEl.style.background = contact.chatBg;
+    }
+  }
+  function statusHtml(text) {
+    var online = text === "在线";
+    return '<span class="status-dot' + (online ? " online" : "") + '"></span><span>' + escapeHtml(text) + "</span>";
+  }
+
+  function initProfile() {
+    renderContactAvatar(pAvatarThem);
+    pNameThem.textContent = contact.name;
+    pAvatarMe.textContent = initials(MY_NAME);
+    pAvatarMe.style.background = MY_COLOR;
+    pNameMe.textContent = MY_NAME;
+  }
+
+  function refreshHeader() {
+    renderContactAvatar(hAvatarThem);
+    hNameThem.textContent = contact.name;
+    hAvatarMe.textContent = initials(MY_NAME);
+    hAvatarMe.style.background = MY_COLOR;
+    hNameMe.textContent = MY_NAME;
+  }
+
+  function refreshContactAppearance() {
+    renderContactAvatar(pAvatarThem);
+    renderContactAvatar(hAvatarThem);
+    renderContactAvatar(callAvatar);
+    renderContactAvatar(inAvatar);
+    renderContactAvatar(floatAvatar);
+    renderMessages();
+    renderFeed();
+  }
+
+  // ===================== 朋友圈 =====================
+  var posts = [];
+  var postIdSeq = 0;
+  var activeCommentId = null;
+
+  var THEM_POSTS = [
+    "今天的天气真不错，出来走走",
+    "分享一首最近单曲循环的歌",
+    "周末去爬山了，风景很好",
+    "喝到了一杯很棒的咖啡",
+    "最近在读一本有意思的书",
+    "晚上去吃了火锅，满足",
+    "工作告一段落，小放松一下",
+    "随手拍了一张路边的花"
+  ];
+  var THEM_COMMENTS = ["哈哈哈", "真不错", "羡慕了", "好看", "赞一个", "我也想去", "很有感觉", "下次一起呀"];
+  var THEM_REPLIES = ["谢谢呀", "哈哈，你也是", "对吧，我也觉得", "嗯嗯", "就是说呀", "下次一起"];
+
+  var HEART_PATH = "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z";
+  var COMMENT_ICON_PATH = "M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z";
+
+  function findPost(id) {
+    for (var i = 0; i < posts.length; i++) {
+      if (String(posts[i].id) === String(id)) return posts[i];
+    }
+    return null;
+  }
+
+  function renderPost(p) {
+    var avatarChar = p.author === "me" ? initials(MY_NAME) : contactAvatarInner();
+    var avatarBg = p.author === "me" ? MY_COLOR : contactAvatarBg();
+    var iLiked = p.likes.indexOf(MY_NAME) !== -1;
+    var hasLikes = p.likes.length > 0;
+    var hasComments = p.comments.length > 0;
+    var interactions = '<div class="interactions' + ((hasLikes || hasComments) ? " has" : "") + '">';
+
+    if (hasLikes) {
+      interactions += '<div class="like-row">' +
+        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="' + HEART_PATH + '"/></svg>' +
+        '<span class="like-names">' + p.likes.map(escapeHtml).join("，") + "</span></div>";
+    }
+    if (hasComments) {
+      p.comments.forEach(function (c) {
+        interactions += '<div class="comment-row"><span class="c-name">' + escapeHtml(c.name) + "：</span><span>" + escapeHtml(c.text) + "</span></div>";
+      });
+    }
+    interactions += "</div>";
+
+    var commentComposer = "";
+    if (String(activeCommentId) === String(p.id)) {
+      commentComposer = '<div class="comment-composer">' +
+        '<input type="text" id="comment-input-' + p.id + '" placeholder="评论..." maxlength="200" autocomplete="off">' +
+        '<button class="comment-send" data-comment-send="' + p.id + '">发送</button>' +
+      "</div>";
+    }
+
+    return '<div class="moment" data-id="' + p.id + '">' +
+      '<div class="avatar moment-avatar" style="background:' + avatarBg + '">' + avatarChar + "</div>" +
+      '<div class="moment-main">' +
+        '<div class="moment-name">' + escapeHtml(p.name) + "</div>" +
+        '<div class="moment-text">' + escapeHtml(p.text) + "</div>" +
+        '<div class="moment-foot">' +
+          '<span class="moment-time">' + formatTime(p.ts) + "</span>" +
+          '<div class="moment-actions">' +
+            '<button class="moment-action' + (iLiked ? " liked" : "") + '" data-act="like" data-id="' + p.id + '">' +
+              '<svg viewBox="0 0 24 24" fill="currentColor"><path d="' + HEART_PATH + '"/></svg><span>赞</span>' +
+            "</button>" +
+            '<button class="moment-action" data-act="comment" data-id="' + p.id + '">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="' + COMMENT_ICON_PATH + '"/></svg><span>评论</span>' +
+            "</button>" +
+          "</div>" +
+        "</div>" +
+        interactions +
+        commentComposer +
+      "</div>" +
+    "</div>";
+  }
+
+  function renderFeed() {
+    var sorted = posts.slice().sort(function (a, b) { return b.ts - a.ts; });
+    var html = "";
+    sorted.forEach(function (p) { html += renderPost(p); });
+    momentsScrollEl.innerHTML = html;
+  }
+
+  function openMoments() {
+    renderFeed();
+    overlay.style.display = "none";
+    viewChat.classList.remove("active");
+    viewMoments.classList.add("active");
+  }
+
+  function openCompose() {
+    composeOverlay.classList.add("show");
+    setTimeout(function () { composeText.focus(); }, 30);
+  }
+  function closeCompose() {
+    composeOverlay.classList.remove("show");
+    composeText.value = "";
+  }
+
+  function publishMoment() {
+    var text = composeText.value.trim();
+    if (!text) return;
+    composeText.value = "";
+    closeCompose();
+    var id = ++postIdSeq;
+    posts.push({ id: id, author: "me", name: MY_NAME, color: MY_COLOR, text: text, ts: Date.now(), likes: [], comments: [] });
+    renderFeed();
+    scheduleThemReact(id);
+  }
+
+  function scheduleThemReact(postId) {
+    setTimeout(function () {
+      var p = findPost(postId);
+      if (!p) return;
+      if (Math.random() < 0.5) {
+        p.likes.push(contact.name);
+      } else {
+        p.comments.push({ name: contact.name, color: contact.color, text: pick(THEM_COMMENTS), ts: Date.now() });
+      }
+      renderFeed();
+    }, randomDelay(1500, 6000));
+  }
+
+  function scheduleThemReply(postId) {
+    setTimeout(function () {
+      var p = findPost(postId);
+      if (!p) return;
+      p.comments.push({ name: contact.name, color: contact.color, text: pick(THEM_REPLIES), ts: Date.now() });
+      renderFeed();
+    }, randomDelay(2000, 180000));
+  }
+
+  function toggleLike(id) {
+    var p = findPost(id);
+    if (!p) return;
+    var i = p.likes.indexOf(MY_NAME);
+    if (i === -1) p.likes.push(MY_NAME);
+    else p.likes.splice(i, 1);
+    renderFeed();
+  }
+
+  function submitComment(id) {
+    var inp = document.getElementById("comment-input-" + id);
+    if (!inp) return;
+    var text = inp.value.trim();
+    if (!text) return;
+    var p = findPost(id);
+    if (!p) return;
+    p.comments.push({ name: MY_NAME, color: MY_COLOR, text: text, ts: Date.now() });
+    activeCommentId = null;
+    renderFeed();
+    if (p.author === "them") scheduleThemReply(id);
+  }
+
+  function onMomentClick(e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    var actBtn = t.closest("[data-act]");
+    if (actBtn) {
+      var id = actBtn.getAttribute("data-id");
+      if (actBtn.getAttribute("data-act") === "like") {
+        toggleLike(id);
+      } else {
+        activeCommentId = (String(activeCommentId) === String(id)) ? null : id;
+        renderFeed();
+        if (activeCommentId) {
+          var inp = document.getElementById("comment-input-" + id);
+          if (inp) inp.focus();
+        }
+      }
+      return;
+    }
+    var sendBtnEl = t.closest("[data-comment-send]");
+    if (sendBtnEl) submitComment(sendBtnEl.getAttribute("data-comment-send"));
+  }
+
+  function addThemPost() {
+    var id = ++postIdSeq;
+    posts.push({ id: id, author: "them", name: contact.name, color: contact.color, text: pick(THEM_POSTS), ts: Date.now(), likes: [], comments: [] });
+    renderFeed();
+  }
+
+  function scheduleThemPost() {
+    setTimeout(function () {
+      var count = Math.random() < 0.5 ? 1 : 2;
+      var i;
+      for (i = 0; i < count; i++) addThemPost();
+      scheduleThemPost();
+    }, randomDelay(3600000, 14400000)); // 1~4 小时随机，每次 1~2 条
+  }
+
+  function startMoments() {
+    var seeds = [
+      { text: "今天的天气真不错，出来走走", ts: Date.now() - 1000 * 60 * 25 },
+      { text: "分享一首最近单曲循环的歌", ts: Date.now() - 1000 * 60 * 60 * 2 }
+    ];
+    seeds.forEach(function (s) {
+      posts.push({ id: ++postIdSeq, author: "them", name: contact.name, color: contact.color, text: s.text, ts: s.ts, likes: [], comments: [] });
+    });
+    scheduleThemPost();
+  }
+
+  // ===================== 消息 =====================
+  var msgSeq = 0;
+  function nextMsgId() { msgSeq++; return "m" + msgSeq; }
+  var pendingQuote = null;
+
+  function findMessage(id) {
+    for (var i = 0; i < contact.messages.length; i++) {
+      if (contact.messages[i].id === id) return contact.messages[i];
+    }
+    return null;
+  }
+
+  function renderQuoteRef(q) {
+    var qm = findMessage(q.id);
+    var text = (qm && qm.revoked) ? "引用的消息已撤回" : q.text;
+    var who = q.from === "me" ? MY_NAME : contact.name;
+    return '<div class="quote-ref">' + escapeHtml(who) + "：" + escapeHtml(text) + "</div>";
+  }
+
+  function renderMessages() {
+    var html = "";
+    contact.messages.forEach(function (m) {
+      if (m.from === "system") {
+        html += '<div class="sys-msg">' + escapeHtml(m.text) + "</div>";
+        return;
+      }
+      if (m.revoked) {
+        html += '<div class="sys-msg">' +
+          (m.from === "me" ? "你" : escapeHtml(contact.name)) + "撤回了一条消息" +
+          "</div>";
+        return;
+      }
+      var cls = m.from === "me" ? "out" : "in";
+      var ch = m.from === "me" ? initials(MY_NAME) : contactAvatarInner();
+      var bg = m.from === "me" ? MY_COLOR : contactAvatarBg();
+      var st = m.from === "me" ? MY_STATUS : contact.status;
+      var timeStr = formatClock(m.ts || Date.now());
+      var quoteHtml = m.quote ? renderQuoteRef(m.quote) : "";
+      html +=
+        '<div class="msg-row ' + cls + '" data-id="' + m.id + '">' +
+          '<div class="avatar-col">' +
+            '<div class="avatar" style="background:' + bg + '">' + ch + "</div>" +
+            '<div class="avatar-status">' + statusHtml(st) + "</div>" +
+          "</div>" +
+          '<div class="bubble-wrap">' +
+            '<div class="bubble">' + quoteHtml + escapeHtml(m.text) + "</div>" +
+            '<div class="msg-time">' + timeStr + "</div>" +
+          "</div>" +
+        "</div>";
+    });
+    chatScrollEl.innerHTML = html;
+    requestAnimationFrame(function () {
+      chatScrollEl.scrollTop = chatScrollEl.scrollHeight;
+    });
+  }
+
+  function openChat() {
+    refreshHeader();
+    renderMessages();
+    overlay.style.display = "none";
+    viewChat.classList.add("active");
+    viewMoments.classList.remove("active");
+    setTimeout(function () { messageInput.focus(); }, 60);
+  }
+
+  function backToProfile() {
+    viewChat.classList.remove("active");
+    overlay.style.display = "flex";
+  }
+
+  // 联系人回复：仅从字卡中抽取 1~3 张，逗号/句号随机拼接
+  function buildCardsReply() {
+    var pool = cards.filter(function (c) { return c.text && c.text.trim(); });
+    if (pool.length === 0) return null;
+    var r = Math.random();
+    var count = r < 0.4 ? 1 : (r < 0.75 ? 2 : 3);
+    var used = {};
+    var parts = [];
+    for (var i = 0; i < count; i++) {
+      var candidates = pool.filter(function (c) { return !used[c.id]; });
+      if (candidates.length === 0) break;
+      var c = pick(candidates);
+      used[c.id] = true;
+      parts.push(c.text.trim());
+    }
+    if (parts.length === 0) return null;
+    if (parts.length === 1) return parts[0];
+    var sep = Math.random() < 0.5 ? "，" : "。";
+    return parts.join(sep);
+  }
+
+  function pickQuotableMessage() {
+    var cands = contact.messages.filter(function (m) {
+      return m.from !== "system" && !m.revoked;
+    });
+    return cands.length ? pick(cands) : null;
+  }
+
+  function themSendMessage() {
+    var text = buildCardsReply();
+    if (text == null) return;
+    var msg = { id: nextMsgId(), from: "them", text: text, ts: Date.now() };
+    if (Math.random() < 0.35) {
+      var q = pickQuotableMessage();
+      if (q) msg.quote = { id: q.id, text: q.text, from: q.from };
+    }
+    contact.messages.push(msg);
+    renderMessages();
+    scheduleThemRevoke(msg.id);
+  }
+
+  function scheduleThemReply() {
+    setTimeout(function () { themSendMessage(); }, randomDelay(0, 40000));
+  }
+
+  // 联系人有 15% 概率撤回自己发出的消息
+  function scheduleThemRevoke(id) {
+    if (Math.random() < 0.15) {
+      setTimeout(function () {
+        var m = findMessage(id);
+        if (m && !m.revoked) {
+          m.revoked = true;
+          renderMessages();
+        }
+      }, randomDelay(1200, 8000));
+    }
+  }
+
+  function clearQuote() {
+    pendingQuote = null;
+    quoteBar.classList.remove("show");
+    quoteBarText.textContent = "";
+  }
+
+  function sendMessage() {
+    var text = messageInput.value.trim();
+    if (!text) return;
+    var msg = { id: nextMsgId(), from: "me", text: text, ts: Date.now() };
+    if (pendingQuote) {
+      msg.quote = { id: pendingQuote.id, text: pendingQuote.text, from: pendingQuote.from };
+      clearQuote();
+    }
+    contact.messages.push(msg);
+    messageInput.value = "";
+    renderMessages();
+    scheduleThemReply();
+  }
+
+  // ===================== 长按菜单（引用 / 撤回） =====================
+  var msgMenuTargetId = null;
+  var suppressClickUntil = 0;
+  var lpTimer = null;
+  var lpRow = null;
+  var lpStartX = 0, lpStartY = 0;
+
+  function hideMsgMenu() {
+    msgMenu.classList.remove("show");
+    msgMenuTargetId = null;
+  }
+
+  function showMsgMenu(row, clientX, clientY) {
+    msgMenuTargetId = row.getAttribute("data-id");
+    suppressClickUntil = Date.now() + 500;
+    msgMenu.style.visibility = "hidden";
+    msgMenu.classList.add("show");
+    var rect = msgMenu.getBoundingClientRect();
+    var x = Math.max(8, Math.min(clientX - rect.width / 2, window.innerWidth - rect.width - 8));
+    var y = clientY - rect.height - 8;
+    if (y < 8) y = clientY + 16;
+    msgMenu.style.left = x + "px";
+    msgMenu.style.top = y + "px";
+    msgMenu.style.visibility = "";
+  }
+
+  function clearLp() {
+    clearTimeout(lpTimer);
+    lpRow = null;
+  }
+
+  chatScrollEl.addEventListener("pointerdown", function (e) {
+    var row = e.target && e.target.closest ? e.target.closest(".msg-row") : null;
+    if (!row) return;
+    lpRow = row;
+    lpStartX = e.clientX;
+    lpStartY = e.clientY;
+    clearTimeout(lpTimer);
+    lpTimer = setTimeout(function () {
+      if (lpRow) {
+        showMsgMenu(lpRow, lpStartX, lpStartY);
+        if (navigator.vibrate) { try { navigator.vibrate(15); } catch (err) {} }
+      }
+      lpRow = null;
+    }, 500);
+  });
+  chatScrollEl.addEventListener("pointermove", function (e) {
+    if (!lpRow) return;
+    if (Math.abs(e.clientX - lpStartX) > 10 || Math.abs(e.clientY - lpStartY) > 10) clearLp();
+  });
+  ["pointerup", "pointercancel"].forEach(function (evt) {
+    chatScrollEl.addEventListener(evt, function () { clearLp(); });
+  });
+
+  function quoteMessage() {
+    var m = findMessage(msgMenuTargetId);
+    if (!m) return;
+    pendingQuote = m;
+    quoteBarText.textContent = (m.from === "me" ? MY_NAME : contact.name) + "：" +
+      (m.revoked ? "引用的消息已撤回" : m.text);
+    quoteBar.classList.add("show");
+    hideMsgMenu();
+    messageInput.focus();
+  }
+
+  function revokeMessage() {
+    var m = findMessage(msgMenuTargetId);
+    if (!m) return;
+    if (!m.revoked) {
+      m.revoked = true;
+      renderMessages();
+    }
+    hideMsgMenu();
+  }
+
+  msgQuoteBtn.addEventListener("click", quoteMessage);
+  msgRevokeBtn.addEventListener("click", revokeMessage);
+  quoteBarClose.addEventListener("click", clearQuote);
+
+  document.addEventListener("click", function (e) {
+    if (Date.now() < suppressClickUntil) return;
+    if (msgMenu.classList.contains("show") && !msgMenu.contains(e.target)) hideMsgMenu();
+  });
+  document.addEventListener("scroll", hideMsgMenu, true);
+
+  // ===================== 菜单 =====================
+  function hideMenu() {
+    menuPop.classList.remove("show");
+    callMenu.classList.remove("show");
+  }
+
+  // ===================== 通话 =====================
+  var activeCall = null;
+  var isMinimized = false;
+  var callSeconds = 0;
+  var callTimerId = null;
+  var callDecisionTimeout = null;
+  var incomingTimeout = null;
+
+  function showCallOverlay() { callOverlay.classList.add("show"); }
+  function hideCallOverlay() { callOverlay.classList.remove("show"); }
+  function showIncomingOverlay() { incomingOverlay.classList.add("show"); }
+  function hideIncomingOverlay() { incomingOverlay.classList.remove("show"); }
+
+  function ensureFloatPosition() {
+    if (callFloat.style.left && callFloat.style.left !== "auto") return;
+    callFloat.style.left = "auto";
+    callFloat.style.right = "16px";
+    callFloat.style.top = "108px";
+  }
+  function showCallFloat() {
+    ensureFloatPosition();
+    callFloat.classList.add("show");
+  }
+  function hideCallFloat() { callFloat.classList.remove("show"); }
+
+  function updateFloatStatus() {
+    if (!activeCall) return;
+    var label = activeCall.type === "video" ? "视频" : "语音";
+    if (activeCall.phase === "ringing") floatStatus.textContent = label + "呼叫中...";
+    else floatStatus.textContent = label + "通话中 " + formatDuration(callSeconds);
+  }
+
+  function renderCallOverlay() {
+    var call = activeCall;
+    if (!call) return;
+    renderContactAvatar(callAvatar);
+    callName.textContent = contact.name;
+    var isVideo = call.type === "video";
+    callOverlay.classList.toggle("video", isVideo);
+    if (call.phase === "ringing") {
+      callStatus.textContent = "正在呼叫...";
+      callTimerEl.textContent = "";
+    } else {
+      callStatus.textContent = isVideo ? "视频通话中" : "语音通话中";
+    }
+    updateFloatStatus();
+  }
+
+  function renderIncomingOverlay() {
+    renderContactAvatar(inAvatar);
+    inName.textContent = contact.name;
+    inStatus.textContent = activeCall.type === "video"
+      ? "邀请你进行视频通话..."
+      : "邀请你进行语音通话...";
+  }
+
+  function startTimer() {
+    clearInterval(callTimerId);
+    callTimerId = setInterval(function () {
+      callSeconds++;
+      var s = formatDuration(callSeconds);
+      callTimerEl.textContent = s;
+      updateFloatStatus();
+    }, 1000);
+  }
+
+  function startOutgoingCall(type) {
+    if (activeCall) return;
+    hideMenu();
+    isMinimized = false;
+    activeCall = { type: type, dir: "out", phase: "ringing" };
+    renderCallOverlay();
+    callTimerEl.textContent = "";
+    callFloat.classList.remove("show");
+    showCallOverlay();
+
+    callDecisionTimeout = setTimeout(function () {
+      if (!activeCall || activeCall.dir !== "out" || activeCall.phase !== "ringing") return;
+      if (Math.random() < 0.5) {
+        connectCall();
+      } else {
+        endCall("对方已取消");
+      }
+    }, randomDelay(1500, 4000));
+  }
+
+  function connectCall() {
+    activeCall.phase = "connected";
+    callSeconds = 0;
+    renderCallOverlay();
+    callTimerEl.textContent = "00:00";
+    updateFloatStatus();
+    if (!isMinimized) {
+      hideIncomingOverlay();
+      hideCallFloat();
+      showCallOverlay();
+    } else {
+      showCallFloat();
+    }
+    startTimer();
+  }
+
+  function startIncomingCall(type) {
+    if (activeCall) return;
+    activeCall = { type: type, dir: "in", phase: "ringing" };
+    renderIncomingOverlay();
+    showIncomingOverlay();
+    incomingTimeout = setTimeout(function () {
+      if (activeCall && activeCall.dir === "in" && activeCall.phase === "ringing") {
+        endCall("对方已取消");
+      }
+    }, 30000);
+  }
+
+  function acceptIncoming() {
+    if (!activeCall || activeCall.dir !== "in") return;
+    clearTimeout(incomingTimeout);
+    hideIncomingOverlay();
+    connectCall();
+  }
+
+  function declineIncoming() {
+    if (!activeCall || activeCall.dir !== "in") return;
+    clearTimeout(incomingTimeout);
+    endCall("已拒绝");
+  }
+
+  function hangUpCurrent() {
+    var reason;
+    if (activeCall && activeCall.phase === "connected") {
+      reason = "通话时长 " + formatDuration(callSeconds);
+    } else {
+      reason = "已取消";
+    }
+    endCall(reason);
+  }
+
+  function endCall(reason) {
+    if (!activeCall) return;
+    var type = activeCall.type;
+    addCallMessage(type, reason);
+    cleanupCall();
+  }
+
+  function addCallMessage(type, reason) {
+    var label = type === "video" ? "[视频通话]" : "[语音通话]";
+    contact.messages.push({ from: "system", text: label + " " + reason });
+    renderMessages();
+  }
+
+  function cleanupCall() {
+    clearInterval(callTimerId);
+    clearTimeout(callDecisionTimeout);
+    clearTimeout(incomingTimeout);
+    hideCallOverlay();
+    hideIncomingOverlay();
+    hideCallFloat();
+    activeCall = null;
+    isMinimized = false;
+    callSeconds = 0;
+  }
+
+  function minimizeCall() {
+    isMinimized = true;
+    renderContactAvatar(floatAvatar);
+    floatName.textContent = contact.name;
+    updateFloatStatus();
+    hideCallOverlay();
+    hideIncomingOverlay();
+    showCallFloat();
+  }
+
+  function expandCall() {
+    isMinimized = false;
+    hideCallFloat();
+    renderCallOverlay();
+    showCallOverlay();
+  }
+
+  function scheduleIncomingCall() {
+    setTimeout(function () {
+      if (!activeCall) {
+        if (Math.random() < 0.5) {
+          startIncomingCall(Math.random() < 0.5 ? "voice" : "video");
+        }
+      }
+      scheduleIncomingCall();
+    }, randomDelay(20000, 60000));
+  }
+
+  // ===================== 联系人状态 =====================
+  function changeStatus() {
+    var cur = contact.status;
+    var next = pick(STATUSES);
+    while (STATUSES.length > 1 && next === cur) next = pick(STATUSES);
+    contact.status = next;
+    renderMessages();
+  }
+
+  function scheduleStatusChange() {
+    setTimeout(function () {
+      changeStatus();
+      scheduleStatusChange();
+    }, randomDelay(3600000, 28800000)); // 1~8 小时随机，间隔 >= 1 小时
+  }
+
+  // ===================== 悬浮窗拖动 =====================
+  var drag = { on: false, offX: 0, offY: 0 };
+  callFloat.addEventListener("pointerdown", function (e) {
+    if (e.target.closest("button")) return;
+    drag.on = true;
+    var r = callFloat.getBoundingClientRect();
+    callFloat.style.left = r.left + "px";
+    callFloat.style.top = r.top + "px";
+    callFloat.style.right = "auto";
+    drag.offX = e.clientX - r.left;
+    drag.offY = e.clientY - r.top;
+    callFloat.classList.add("dragging");
+  });
+  window.addEventListener("pointermove", function (e) {
+    if (!drag.on) return;
+    var w = window.innerWidth, h = window.innerHeight;
+    var fw = callFloat.offsetWidth, fh = callFloat.offsetHeight;
+    var x = Math.max(0, Math.min(e.clientX - drag.offX, w - fw));
+    var y = Math.max(0, Math.min(e.clientY - drag.offY, h - fh));
+    callFloat.style.left = x + "px";
+    callFloat.style.top = y + "px";
+  });
+  window.addEventListener("pointerup", function () {
+    drag.on = false;
+    callFloat.classList.remove("dragging");
+  });
+
+  // ===================== 事件 =====================
+  sendBtn.addEventListener("click", sendMessage);
+  messageInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  btnChat.addEventListener("click", openChat);
+  btnBack.addEventListener("click", backToProfile);
+  btnMoments.addEventListener("click", openMoments);
+  momentsBack.addEventListener("click", function () {
+    viewMoments.classList.remove("active");
+    overlay.style.display = "flex";
+  });
+
+  btnSettings.addEventListener("click", function () {
+    overlay.style.display = "none";
+    viewChat.classList.remove("active");
+    viewMoments.classList.remove("active");
+    viewWordcards.classList.remove("active");
+    viewSettings.classList.add("active");
+  });
+  settingsBack.addEventListener("click", function () {
+    viewSettings.classList.remove("active");
+    overlay.style.display = "flex";
+  });
+
+  btnWordcards.addEventListener("click", function () {
+    setBatchMode(false);
+    viewSettings.classList.remove("active");
+    viewWordcards.classList.add("active");
+  });
+  wordcardsBack.addEventListener("click", function () {
+    setBatchMode(false);
+    viewWordcards.classList.remove("active");
+    viewSettings.classList.add("active");
+  });
+
+  btnPublish.addEventListener("click", openCompose);
+  composeCancel.addEventListener("click", closeCompose);
+  composePublish.addEventListener("click", publishMoment);
+  composeOverlay.addEventListener("click", function (e) {
+    if (e.target === composeOverlay) closeCompose();
+  });
+  momentsScrollEl.addEventListener("click", onMomentClick);
+
+  // 通话相关按钮
+  btnCall.addEventListener("click", function (e) {
+    e.stopPropagation();
+    menuPop.classList.remove("show");
+    callMenu.classList.toggle("show");
+  });
+  callVoiceOpt.addEventListener("click", function () {
+    callMenu.classList.remove("show");
+    startOutgoingCall("voice");
+  });
+  callVideoOpt.addEventListener("click", function () {
+    callMenu.classList.remove("show");
+    startOutgoingCall("video");
+  });
+  callHangup.addEventListener("click", hangUpCurrent);
+  callMinimize.addEventListener("click", minimizeCall);
+  floatExpand.addEventListener("click", expandCall);
+  floatHangup.addEventListener("click", function () {
+    hangUpCurrent();
+  });
+  inAccept.addEventListener("click", acceptIncoming);
+  inDecline.addEventListener("click", declineIncoming);
+
+  // 三点菜单
+  btnMore.addEventListener("click", function (e) {
+    e.stopPropagation();
+    callMenu.classList.remove("show");
+    menuPop.classList.toggle("show");
+  });
+  hAvatarThem.addEventListener("click", function () { avatarFile.click(); });
+  menuBackground.addEventListener("click", function () {
+    menuPop.classList.remove("show");
+    bgFile.click();
+  });
+  document.addEventListener("click", function (e) {
+    if (menuPop.classList.contains("show")) {
+      if (!menuPop.contains(e.target) && !btnMore.contains(e.target)) menuPop.classList.remove("show");
+    }
+    if (callMenu.classList.contains("show")) {
+      if (!callMenu.contains(e.target) && !btnCall.contains(e.target)) callMenu.classList.remove("show");
+    }
+  });
+
+  // 本地文件上传（头像 / 背景）
+  function readFileToDataUrl(file, cb) {
+    var r = new FileReader();
+    r.onload = function () { cb(r.result); };
+    r.readAsDataURL(file);
+  }
+  avatarFile.addEventListener("change", function () {
+    var f = avatarFile.files[0];
+    if (!f) return;
+    readFileToDataUrl(f, function (dataUrl) {
+      contact.avatarUrl = dataUrl;
+      refreshContactAppearance();
+      refreshHeader();
+      avatarFile.value = "";
+    });
+  });
+  bgFile.addEventListener("change", function () {
+    var f = bgFile.files[0];
+    if (!f) return;
+    readFileToDataUrl(f, function (dataUrl) {
+      contact.chatBgImage = dataUrl;
+      applyChatBg();
+      bgFile.value = "";
+    });
+  });
+
+  // ===================== 字卡 =====================
+  var cardSeq = 0;
+  var groupSeq = 0;
+  function nextCardId() { cardSeq++; return "c" + cardSeq; }
+  function nextGroupId() { groupSeq++; return "g" + groupSeq; }
+  function buildCard(t, g) { return { id: nextCardId(), text: t, group: g || null }; }
+
+  var cards = ["你好", "谢谢", "再见", "对不起", "没关系", "请稍等", "早安", "晚安"].map(function (t) { return buildCard(t, null); });
+  var groups = [];
+  var pendingImport = null;
+  var pendingMoveIds = [];
+  var batchOn = false;
+  var selectedCards = {};
+
+  function findCard(id) {
+    for (var i = 0; i < cards.length; i++) if (cards[i].id === id) return cards[i];
+    return null;
+  }
+  function cardsInGroup(gid) {
+    return cards.filter(function (c) { return c.group === gid; });
+  }
+  function selectedIds() { return Object.keys(selectedCards); }
+
+  function renderCardItem(c) {
+    var checked = selectedCards[c.id] ? " checked" : "";
+    return '<div class="wc-card' + (batchOn ? " check-mode" : "") + '" data-id="' + c.id + '">' +
+      '<span class="wc-card-check' + checked + '"></span>' +
+      '<span class="wc-card-text">' + escapeHtml(c.text) + "</span>" +
+    '</div>';
+  }
+
+  function renderGroupSection(name, list) {
+    var body = "";
+    if (list.length === 0) {
+      body = '<div class="wc-empty" style="padding:8px 0">暂无字卡</div>';
+    } else {
+      list.forEach(function (c) { body += renderCardItem(c); });
+    }
+    return '<div class="wc-group">' +
+      '<div class="wc-group-header">' +
+        '<span class="wc-group-name">' + escapeHtml(name) + '</span>' +
+        '<span class="wc-group-count">' + list.length + ' 张</span>' +
+      '</div>' + body +
+    '</div>';
+  }
+
+  function renderWordCards() {
+    var html = "";
+    var ungrouped = cardsInGroup(null);
+    if (ungrouped.length > 0 || groups.length === 0) {
+      html += renderGroupSection("未分组", ungrouped);
+    }
+    groups.forEach(function (g) {
+      html += renderGroupSection(g.name, cardsInGroup(g.id));
+    });
+    if (!html) html = '<div class="wc-empty">暂无字卡，点击右上角 + 添加</div>';
+    wcScroll.innerHTML = html;
+  }
+
+  function updateBatchInfo() {
+    wcBatchInfo.textContent = "已选 " + selectedIds().length + " 项";
+  }
+  function setBatchMode(on) {
+    batchOn = !!on;
+    if (!batchOn) selectedCards = {};
+    renderWordCards();
+    wcBatchBar.classList.toggle("show", batchOn);
+    updateBatchInfo();
+  }
+
+  function parseLines(text) {
+    var out = [];
+    text.split(/\r?\n/).forEach(function (line) {
+      var t = line.replace(/^\uFEFF/, "").trim();
+      if (t) out.push(t);
+    });
+    return out;
+  }
+
+  function safeParseJson(text) {
+    try { return JSON.parse(text); } catch (e) { return null; }
+  }
+
+  function extractImport(json) {
+    var cardArr = null;
+    if (Array.isArray(json)) {
+      cardArr = json.filter(function (x) { return x !== null && x !== undefined; }).map(String);
+    } else if (json && typeof json === "object") {
+      var arr = json.cards || json.list || json.data || json.items;
+      if (Array.isArray(arr)) cardArr = arr.map(String);
+    }
+    if (!cardArr) return null;
+    var imp = { cards: cardArr, groups: [] };
+    if (json && typeof json === "object" && Array.isArray(json.groups)) {
+      json.groups.forEach(function (g) {
+        var name = (g && g.name) ? String(g.name) : "未命名分组";
+        var gc = Array.isArray(g.cards) ? g.cards.map(String) : [];
+        imp.groups.push({ name: name, cards: gc });
+      });
+    }
+    return imp;
+  }
+
+  function showPreview(imp, sourceLabel) {
+    pendingImport = imp;
+    wcPreviewSummary.textContent = "来源：" + sourceLabel + " · 字卡 " + imp.cards.length + " 张" + (imp.groups.length ? " · 分组 " + imp.groups.length + " 个" : "");
+    var html = "";
+    var max = 30;
+    for (var i = 0; i < imp.cards.length && i < max; i++) {
+      html += '<div class="wc-preview-item">' + escapeHtml(imp.cards[i]) + "</div>";
+    }
+    if (imp.cards.length > max) {
+      html += '<div class="wc-preview-more">… 还有 ' + (imp.cards.length - max) + " 张</div>";
+    }
+    wcPreviewList.innerHTML = html;
+    wcPreviewOverlay.classList.add("show");
+  }
+
+  function confirmImport() {
+    if (pendingImport) {
+      cardSeq = 0; groupSeq = 0;
+      cards = pendingImport.cards.map(function (t) { return buildCard(t, null); });
+      groups = [];
+      pendingImport.groups.forEach(function (g) {
+        var gid = nextGroupId();
+        g.cards.forEach(function (t) { cards.push(buildCard(t, gid)); });
+        groups.push({ id: gid, name: g.name });
+      });
+      pendingImport = null;
+      setBatchMode(false);
+    }
+    wcPreviewOverlay.classList.remove("show");
+  }
+
+  // 添加字卡
+  wcAddBtn.addEventListener("click", function () {
+    wcAddText.value = "";
+    wcAddOverlay.classList.add("show");
+    setTimeout(function () { wcAddText.focus(); }, 50);
+  });
+  wcAddCancel.addEventListener("click", function () { wcAddOverlay.classList.remove("show"); });
+  wcAddConfirm.addEventListener("click", function () {
+    var lines = parseLines(wcAddText.value);
+    wcAddOverlay.classList.remove("show");
+    if (lines.length === 0) { alert("请输入字卡，一行一个"); return; }
+    lines.forEach(function (t) { cards.push(buildCard(t, null)); });
+    setBatchMode(false);
+  });
+
+  // 管理分组
+  wcManageGroupBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    gcPop.classList.toggle("show");
+  });
+  gcNewGroup.addEventListener("click", function () {
+    gcPop.classList.remove("show");
+    wcGroupNameInput.value = "";
+    wcGroupOverlay.classList.add("show");
+    setTimeout(function () { wcGroupNameInput.focus(); }, 50);
+  });
+  gcBatch.addEventListener("click", function () {
+    gcPop.classList.remove("show");
+    setBatchMode(true);
+  });
+  document.addEventListener("click", function (e) {
+    if (gcPop.classList.contains("show") && !gcPop.contains(e.target) && e.target !== wcManageGroupBtn) {
+      gcPop.classList.remove("show");
+    }
+  });
+
+  // 新建分组
+  wcGroupCancel.addEventListener("click", function () { wcGroupOverlay.classList.remove("show"); });
+  wcGroupConfirm.addEventListener("click", function () {
+    var name = wcGroupNameInput.value.trim();
+    if (!name) { wcGroupNameInput.focus(); return; }
+    for (var i = 0; i < groups.length; i++) {
+      if (groups[i].name === name) { alert("分组已存在"); return; }
+    }
+    groups.push({ id: nextGroupId(), name: name });
+    wcGroupOverlay.classList.remove("show");
+    setBatchMode(false);
+  });
+
+  // 批量管理（勾选）
+  wcScroll.addEventListener("click", function (e) {
+    if (!batchOn) return;
+    var el = e.target;
+    while (el && el !== wcScroll && !el.classList.contains("wc-card")) el = el.parentNode;
+    if (!el || el === wcScroll) return;
+    var id = el.getAttribute("data-id");
+    if (selectedCards[id]) delete selectedCards[id]; else selectedCards[id] = true;
+    renderWordCards();
+    updateBatchInfo();
+  });
+
+  wcBatchMove.addEventListener("click", function () {
+    var ids = selectedIds();
+    if (ids.length === 0) { alert("请先勾选要移动的字卡"); return; }
+    pendingMoveIds = ids.slice();
+    var html = '<button class="gc-item" data-gid="__none__">未分组</button>';
+    groups.forEach(function (g) {
+      html += '<button class="gc-item" data-gid="' + g.id + '">' + escapeHtml(g.name) + '</button>';
+    });
+    wcMoveList.innerHTML = html;
+    wcMoveOverlay.classList.add("show");
+  });
+  wcMoveList.addEventListener("click", function (e) {
+    var el = e.target;
+    while (el && el !== wcMoveList && !el.classList.contains("gc-item")) el = el.parentNode;
+    if (!el || el === wcMoveList) return;
+    var gid = el.getAttribute("data-gid");
+    var target = (gid === "__none__") ? null : gid;
+    pendingMoveIds.forEach(function (id) {
+      var c = findCard(id);
+      if (c) c.group = target;
+    });
+    pendingMoveIds = [];
+    wcMoveOverlay.classList.remove("show");
+    setBatchMode(false);
+  });
+  wcMoveCancel.addEventListener("click", function () {
+    pendingMoveIds = [];
+    wcMoveOverlay.classList.remove("show");
+  });
+  wcBatchDel.addEventListener("click", function () {
+    var ids = selectedIds();
+    if (ids.length === 0) { alert("请先勾选要删除的字卡"); return; }
+    cards = cards.filter(function (c) { return !selectedCards[c.id]; });
+    selectedCards = {};
+    renderWordCards();
+    updateBatchInfo();
+  });
+  wcBatchDone.addEventListener("click", function () { setBatchMode(false); });
+
+  // 导入导出
+  wcImportJsonBtn.addEventListener("click", function () { wcJsonFile.click(); });
+  wcJsonFile.addEventListener("change", function () {
+    var f = wcJsonFile.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      var imp = extractImport(safeParseJson(r.result));
+      wcJsonFile.value = "";
+      if (!imp || imp.cards.length === 0) { alert("JSON 解析失败或没有可导入的字卡"); return; }
+      showPreview(imp, "JSON 文件");
+    };
+    r.readAsText(f);
+  });
+
+  wcImportTextBtn.addEventListener("click", function () { wcTextFile.click(); });
+  wcTextFile.addEventListener("change", function () {
+    var f = wcTextFile.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      var arr = parseLines(r.result);
+      wcTextFile.value = "";
+      if (arr.length === 0) { alert("文档中没有可导入的内容"); return; }
+      showPreview({ cards: arr, groups: [] }, "文本文档");
+    };
+    r.readAsText(f);
+  });
+
+  wcExportBtn.addEventListener("click", function () {
+    if (cards.length === 0) { alert("暂无字卡可导出"); return; }
+    var data = {
+      cards: cards.map(function (c) { return c.text; }),
+      groups: groups.map(function (g) {
+        return { name: g.name, cards: cardsInGroup(g.id).map(function (c) { return c.text; }) };
+      })
+    };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "word-cards.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  });
+
+  wcPreviewCancel.addEventListener("click", function () {
+    pendingImport = null;
+    wcPreviewOverlay.classList.remove("show");
+  });
+  wcPreviewConfirm.addEventListener("click", confirmImport);
+
+  // ===================== 初始化 =====================
+  contact.messages.forEach(function (m) {
+    if (m.from !== "system" && !m.id) m.id = nextMsgId();
+  });
+  initProfile();
+  refreshHeader();
+  applyChatBg();
+  startMoments();
+  scheduleStatusChange();
+  scheduleIncomingCall();
+})();
+</script>
+</body>
+</html>
