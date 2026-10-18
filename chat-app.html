@@ -1662,6 +1662,7 @@
     posts.push({ id: id, author: "me", name: MY_NAME, color: MY_COLOR, text: text, ts: Date.now(), likes: [], comments: [] });
     renderFeed();
     scheduleThemReact(id);
+    persistState();
   }
 
   function scheduleThemReact(postId) {
@@ -2099,6 +2100,7 @@
     playSendSound();
     scheduleThemReply();
     scheduleProactiveMessage();
+    persistState();
   }
 
   // ===================== 长按菜单（引用 / 撤回） =====================
@@ -2470,6 +2472,7 @@
       if (i >= list.length) {
         if (ringtones.length > 0 && !currentRingtone()) pickContactRingtone();
         renderRingtones();
+        persistState();
         ringtoneFile.value = "";
         return;
       }
@@ -2489,6 +2492,7 @@
     ringtones.splice(idx, 1);
     if (contactRingtoneId === id) pickContactRingtone();
     renderRingtones();
+    persistState();
   }
 
   // ===================== 联系人状态 =====================
@@ -2695,6 +2699,7 @@
       contact.avatarUrl = dataUrl;
       refreshContactAppearance();
       refreshHeader();
+      persistState();
       avatarFile.value = "";
     });
   });
@@ -2707,6 +2712,7 @@
       refreshHeader();
       renderMessages();
       renderFeed();
+      persistState();
       avatarMeFile.value = "";
     });
   });
@@ -2716,6 +2722,7 @@
     readFileToDataUrl(f, function (dataUrl) {
       contact.chatBgImage = dataUrl;
       applyChatBg();
+      persistState();
       bgFile.value = "";
     });
   });
@@ -3009,10 +3016,56 @@
   wcPreviewConfirm.addEventListener("click", confirmImport);
 
   // ===================== 数据持久化 =====================
+  // 头像/背景/铃声是 base64，体积大，localStorage 有 ~5MB 上限容易丢，
+  // 因此主存储改用 IndexedDB 存全量；localStorage 仅作为文字级兜底。
   var SAVE_KEY = "chat_app_state_v1";
+  var IDB_DB_NAME = "chat_app_db";
+  var IDB_STORE = "state";
+  var idb = null;
 
-  function persistState() {
-    var state = {
+  function idbReady() {
+    return new Promise(function (resolve, reject) {
+      if (idb) { resolve(idb); return; }
+      if (!window.indexedDB) { reject(new Error("no indexedDB")); return; }
+      var req = indexedDB.open(IDB_DB_NAME, 1);
+      req.onupgradeneeded = function () {
+        var d = req.result;
+        if (!d.objectStoreNames.contains(IDB_STORE)) d.createObjectStore(IDB_STORE);
+      };
+      req.onsuccess = function () { idb = req.result; resolve(idb); };
+      req.onerror = function () { reject(req.error || new Error("idb open fail")); };
+    });
+  }
+
+  function idbPut(key, val) {
+    return idbReady().then(function (db) {
+      return new Promise(function (resolve) {
+        var tx;
+        try { tx = db.transaction(IDB_STORE, "readwrite"); }
+        catch (e) { resolve(); return; }
+        tx.objectStore(IDB_STORE).put(val, key);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { resolve(); };
+        tx.onabort = function () { resolve(); };
+      });
+    }).catch(function () {});
+  }
+
+  function idbGet(key) {
+    return idbReady().then(function (db) {
+      return new Promise(function (resolve) {
+        var tx;
+        try { tx = db.transaction(IDB_STORE, "readonly"); }
+        catch (e) { resolve(null); return; }
+        var rq = tx.objectStore(IDB_STORE).get(key);
+        rq.onsuccess = function () { resolve(rq.result); };
+        rq.onerror = function () { resolve(null); };
+      });
+    }).catch(function () { return null; });
+  }
+
+  function buildState() {
+    return {
       myAvatarUrl: myAvatarUrl,
       contact: {
         name: contact.name,
@@ -3036,33 +3089,31 @@
       soundOn: soundOn,
       sendSoundOn: sendSoundOn
     };
+  }
+
+  function buildLightState() {
+    var s = buildState();
+    s.myAvatarUrl = null;
+    s.contact.avatarUrl = "";
+    s.contact.chatBgImage = "";
+    s.ringtones = [];
+    s.contactRingtoneId = null;
+    return s;
+  }
+
+  function persistState() {
+    var state = buildState();
+    // 主存储：IndexedDB 存全量（含图片/音频 base64）
+    idbPut(SAVE_KEY, state);
+    // 兜底：localStorage 同步存，容量不足时降级为纯文字
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(state));
     } catch (e) {
-      // 二进制（图片/音频 base64）过大时，降级保存不含二进制的内容
-      try {
-        localStorage.setItem(SAVE_KEY, JSON.stringify({
-          myAvatarUrl: null,
-          contact: {
-            name: contact.name, color: contact.color, avatarUrl: "",
-            chatBg: contact.chatBg, chatBgImage: "", status: contact.status,
-            messages: contact.messages
-          },
-          posts: posts, postIdSeq: postIdSeq,
-          cards: cards, cardSeq: cardSeq, groups: groups, groupSeq: groupSeq,
-          ringtones: [], contactRingtoneId: null, ringtoneSeq: ringtoneSeq,
-          msgSeq: msgSeq, soundOn: soundOn, sendSoundOn: sendSoundOn
-        }));
-      } catch (e2) {}
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify(buildLightState())); } catch (e2) {}
     }
   }
 
-  function restoreState() {
-    var raw = null;
-    try { raw = localStorage.getItem(SAVE_KEY); } catch (e) {}
-    if (!raw) return;
-    var s;
-    try { s = JSON.parse(raw); } catch (e) { return; }
+  function applyState(s) {
     if (!s) return;
     if (typeof s.myAvatarUrl === "string") myAvatarUrl = s.myAvatarUrl;
     if (s.contact) {
@@ -3088,29 +3139,50 @@
     if (typeof s.sendSoundOn === "boolean") sendSoundOn = s.sendSoundOn;
   }
 
+  function restoreState(cb) {
+    // 1) 同步先用 localStorage 兜底（快速，保证文字数据立即可用）
+    var raw = null;
+    try { raw = localStorage.getItem(SAVE_KEY); } catch (e) {}
+    if (raw) {
+      try { applyState(JSON.parse(raw)); } catch (e) {}
+    }
+    // 2) 异步从 IndexedDB 恢复全量（含大图片/音频 base64）
+    idbGet(SAVE_KEY).then(function (s) {
+      if (s) { try { applyState(s); } catch (e) {} }
+      cb();
+    });
+  }
+
   // 退出/切后台/定时兜底保存
-  window.addEventListener("pagehide", persistState);
+  window.addEventListener("pagehide", function () {
+    // pagehide 里 localStorage 同步写入最可靠；IndexedDB 仍尽力异步写入
+    var state = buildState();
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
+    catch (e) { try { localStorage.setItem(SAVE_KEY, JSON.stringify(buildLightState())); } catch (e2) {} }
+    idbPut(SAVE_KEY, state);
+  });
   window.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden") persistState();
   });
   setInterval(persistState, 4000);
 
   // ===================== 初始化 =====================
-  restoreState();
-  updateSoundSwitches();
-
-  contact.messages.forEach(function (m) {
-    if (m.from !== "system" && !m.id) m.id = nextMsgId();
-  });
-  initProfile();
-  refreshHeader();
-  applyChatBg();
-  renderRingtones();
-  scheduleContactRingtoneChange();
-  startMoments();
-  scheduleStatusChange();
-  scheduleIncomingCall();
-  scheduleProactiveMessage();
+  function boot() {
+    updateSoundSwitches();
+    contact.messages.forEach(function (m) {
+      if (m.from !== "system" && !m.id) m.id = nextMsgId();
+    });
+    initProfile();
+    refreshHeader();
+    applyChatBg();
+    renderRingtones();
+    scheduleContactRingtoneChange();
+    startMoments();
+    scheduleStatusChange();
+    scheduleIncomingCall();
+    scheduleProactiveMessage();
+  }
+  restoreState(boot);
 })();
 </script>
 </body>
