@@ -1008,6 +1008,10 @@
           <span>消息</span>
           <svg class="settings-row-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </button>
+        <button class="settings-row" id="btn-poke">
+          <span>拍一拍</span>
+          <svg class="settings-row-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
       </div>
     </div>
   </div>
@@ -1150,6 +1154,10 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
     <span>更换聊天背景</span>
   </button>
+  <button class="menu-item" id="menu-poke">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.83L7 15"/></svg>
+    <span>拍一拍</span>
+  </button>
 </div>
 
 <div class="menu-pop" id="call-menu">
@@ -1216,6 +1224,19 @@
     <div class="picker-actions">
       <button class="wc-btn-cancel" id="wc-group-cancel">取消</button>
       <button class="wc-btn-confirm" id="wc-group-confirm">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 拍一拍内容设置 ===================== -->
+<div class="picker-overlay" id="poke-overlay">
+  <div class="picker-card">
+    <div class="picker-title">拍一拍内容</div>
+    <input type="text" class="wc-dialog-input" id="poke-input" placeholder="例如：脑袋" maxlength="30" autocomplete="off">
+    <div class="wc-preview-summary">留空则只显示「拍了拍」，填了会显示「拍了拍…的 XXX」</div>
+    <div class="picker-actions">
+      <button class="wc-btn-cancel" id="poke-cancel">取消</button>
+      <button class="wc-btn-confirm" id="poke-confirm">保存</button>
     </div>
   </div>
 </div>
@@ -1302,6 +1323,7 @@
   var MY_COLOR = "#3b82f6";
   var MY_STATUS = "在线";
   var myAvatarUrl = null;
+  var pokeText = "";   // 拍一拍内容
 
   var STATUSES = ["在线", "离线", "忙碌", "离开一下", "工作中", "休息中", "学习中", "吃饭中", "散步中", "勿扰模式"];
 
@@ -1443,6 +1465,13 @@
   var quoteBar = document.getElementById("quote-bar");
   var quoteBarText = document.getElementById("quote-bar-text");
   var quoteBarClose = document.getElementById("quote-bar-close");
+
+  var menuPoke = document.getElementById("menu-poke");
+  var btnPoke = document.getElementById("btn-poke");
+  var pokeOverlay = document.getElementById("poke-overlay");
+  var pokeInput = document.getElementById("poke-input");
+  var pokeCancel = document.getElementById("poke-cancel");
+  var pokeConfirm = document.getElementById("poke-confirm");
 
   // ===== 通用工具 =====
   function initials(name) { return name.charAt(0); }
@@ -2067,6 +2096,37 @@
     }, delay);
   }
 
+  // ===================== 拍一拍 =====================
+  function pokeMessage(from) {
+    var suffix = pokeText.trim();
+    var text;
+    if (from === "me") {
+      text = suffix ? ("你拍了拍" + contact.name + "的" + suffix) : ("你拍了拍" + contact.name);
+    } else {
+      text = suffix ? (contact.name + "拍了拍你的" + suffix) : (contact.name + "拍了拍你");
+    }
+    contact.messages.push({ from: "system", text: text });
+    renderMessages();
+  }
+
+  function pokeThem() {
+    pokeMessage("me");
+    persistState();
+  }
+
+  function pokeMe() {
+    pokeMessage("them");
+    notifyIfNotInChat({ text: "拍了拍你", isPinyin: false });
+    persistState();
+  }
+
+  function scheduleThemPoke() {
+    setTimeout(function () {
+      pokeMe();
+      scheduleThemPoke();
+    }, randomDelay(60000, 600000)); // 1~10 分钟随机拍一拍
+  }
+
   // 联系人有 15% 概率撤回自己发出的消息
   function scheduleThemRevoke(id) {
     if (Math.random() < 0.15) {
@@ -2677,6 +2737,34 @@
     menuPop.classList.remove("show");
     bgFile.click();
   });
+  menuPoke.addEventListener("click", function () {
+    menuPop.classList.remove("show");
+    pokeThem();
+  });
+
+  // 拍一拍内容设置弹窗
+  function openPokeSettings() {
+    pokeInput.value = pokeText;
+    pokeOverlay.classList.add("show");
+    setTimeout(function () { pokeInput.focus(); }, 60);
+  }
+  function closePokeSettings() {
+    pokeOverlay.classList.remove("show");
+  }
+  function savePokeSettings() {
+    pokeText = pokeInput.value.trim();
+    closePokeSettings();
+    persistState();
+  }
+  btnPoke.addEventListener("click", openPokeSettings);
+  pokeCancel.addEventListener("click", closePokeSettings);
+  pokeConfirm.addEventListener("click", savePokeSettings);
+  pokeInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); savePokeSettings(); }
+  });
+  pokeOverlay.addEventListener("click", function (e) {
+    if (e.target === pokeOverlay) closePokeSettings();
+  });
   document.addEventListener("click", function (e) {
     if (menuPop.classList.contains("show")) {
       if (!menuPop.contains(e.target) && !btnMore.contains(e.target)) menuPop.classList.remove("show");
@@ -3087,7 +3175,8 @@
       ringtoneSeq: ringtoneSeq,
       msgSeq: msgSeq,
       soundOn: soundOn,
-      sendSoundOn: sendSoundOn
+      sendSoundOn: sendSoundOn,
+      pokeText: pokeText
     };
   }
 
@@ -3137,6 +3226,7 @@
     if (typeof s.msgSeq === "number") msgSeq = s.msgSeq;
     if (typeof s.soundOn === "boolean") soundOn = s.soundOn;
     if (typeof s.sendSoundOn === "boolean") sendSoundOn = s.sendSoundOn;
+    if (typeof s.pokeText === "string") pokeText = s.pokeText;
   }
 
   function restoreState(cb) {
@@ -3181,6 +3271,7 @@
     scheduleStatusChange();
     scheduleIncomingCall();
     scheduleProactiveMessage();
+    scheduleThemPoke();
   }
   restoreState(boot);
 })();
