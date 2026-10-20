@@ -1194,6 +1194,17 @@
           <svg class="settings-row-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </button>
       </div>
+      <div class="settings-section" style="margin-top:14px;">
+        <button class="settings-row" id="btn-export-data">
+          <span>导出数据备份</span>
+          <svg class="settings-row-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M9 7l3 3 3-3"/><path d="M4 19h16"/></svg>
+        </button>
+        <button class="settings-row" id="btn-import-data">
+          <span>导入数据备份</span>
+          <svg class="settings-row-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M9 7l3-3 3 3"/><path d="M4 19h16"/></svg>
+        </button>
+      </div>
+      <div class="wc-empty" style="text-align:left; padding-left:4px; margin-top:12px;">导出可将头像、聊天背景、字卡、铃声、表情包等全部数据保存为 JSON 文件；导入该文件可完整恢复</div>
     </div>
   </div>
 
@@ -1447,6 +1458,7 @@
 <input type="file" id="ringtone-file" accept="audio/*" multiple hidden>
 <input type="file" id="sticker-file" accept="image/*,image/gif" multiple hidden>
 <input type="file" id="mysticker-file" accept="image/*,image/gif" multiple hidden>
+<input type="file" id="backup-file" accept="application/json,.json" hidden>
 
 <!-- ===================== 字卡导入预览 ===================== -->
 <div class="picker-overlay" id="wc-preview-overlay">
@@ -1839,6 +1851,9 @@
   var mystickersUpload = document.getElementById("mystickers-upload");
   var mystickersScroll = document.getElementById("mystickers-scroll");
   var mystickerFile = document.getElementById("mysticker-file");
+  var backupFile = document.getElementById("backup-file");
+  var btnExportData = document.getElementById("btn-export-data");
+  var btnImportData = document.getElementById("btn-import-data");
   var quizOverlay = document.getElementById("quiz-overlay");
   var quizBody = document.getElementById("quiz-body");
   var quizAdd = document.getElementById("quiz-add");
@@ -3692,6 +3707,16 @@
     }
   });
 
+  // ===================== 数据备份：导出 / 导入 =====================
+  btnExportData.addEventListener("click", exportData);
+  btnImportData.addEventListener("click", function () { backupFile.click(); });
+  backupFile.addEventListener("change", function () {
+    var f = backupFile.files && backupFile.files[0];
+    if (!f) return;
+    if (!confirm("导入将覆盖当前所有数据，确定继续？")) { backupFile.value = ""; return; }
+    importData(f);
+  });
+
   // ===================== 消息音效音量（独立于手机媒体音量） =====================
   soundVolumeInput.addEventListener("input", function () {
     soundVolume = Math.max(0, Math.min(1, (+soundVolumeInput.value || 0) / 100));
@@ -4181,6 +4206,42 @@
     if (typeof s.myStickerSeq === "number") myStickerSeq = s.myStickerSeq;
     if (typeof s.contactReplyCount === "number") contactReplyCount = s.contactReplyCount;
     if (typeof s.contactReplyTime === "number") contactReplyTime = s.contactReplyTime;
+  }
+
+  function formatDateStamp() {
+    var d = new Date();
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+  }
+
+  // 导出：把整个网站的全部数据（含头像/背景/图片/音频等 base64）打包成 JSON 文件下载
+  function exportData() {
+    var data = buildState();
+    data.version = 1;
+    data.exportedAt = new Date().toISOString();
+    var blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "chat-backup-" + formatDateStamp() + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  }
+
+  // 导入：解析备份文件并完整覆盖当前数据，写入 IndexedDB 后刷新页面
+  function importData(file) {
+    var r = new FileReader();
+    r.onload = function () {
+      var data;
+      try { data = JSON.parse(r.result); } catch (e) { alert("导入失败：不是有效的备份文件"); return; }
+      applyState(data);
+      idbPut(SAVE_KEY, buildState()).then(function () {
+        location.reload();
+      });
+    };
+    r.readAsText(file);
   }
 
   function restoreState(cb) {
