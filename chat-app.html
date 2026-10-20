@@ -653,6 +653,21 @@
   .menu-item:active { background: #f1f3f5; }
   .menu-item svg { width: 18px; height: 18px; color: #5b616a; }
 
+  /* ===================== 加号面板 ===================== */
+  .plus-panel {
+    position: fixed;
+    left: 12px; bottom: 82px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+    padding: 6px;
+    z-index: 500;
+    display: none;
+    flex-direction: column;
+    min-width: 152px;
+  }
+  .plus-panel.show { display: flex; }
+
   /* ===================== 选择弹窗（头像/背景） ===================== */
   .picker-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -1021,6 +1036,8 @@
   /* ===================== 新增：备注/拍一拍列表/表情包/问卷时间/音量/回复设置 ===================== */
   #h-name-them { pointer-events: auto; cursor: pointer; }
   #h-name-them:active { opacity: 0.6; }
+  #h-name-me { pointer-events: auto; cursor: pointer; }
+  #h-name-me:active { opacity: 0.6; }
 
   .poke-del {
     flex: 0 0 auto; width: 26px; height: 26px; border: none; background: transparent;
@@ -1286,6 +1303,19 @@
     </header>
     <div class="wc-scroll" id="poke-scroll"></div>
   </div>
+
+  <div class="view" id="view-mystickers">
+    <header class="header">
+      <button class="icon-btn" id="mystickers-back" aria-label="返回">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="title">我的表情包</div>
+      <button class="icon-btn right" id="mystickers-upload" aria-label="导入表情包">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </header>
+    <div class="emo-scroll" id="mystickers-scroll"></div>
+  </div>
 </div>
 
 <!-- ===================== 黑色连接页（首页） ===================== -->
@@ -1396,6 +1426,18 @@
   </button>
 </div>
 
+<!-- ===================== 加号面板 ===================== -->
+<div class="plus-panel" id="plus-panel">
+  <button class="menu-item" id="plus-quiz">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    <span>问卷</span>
+  </button>
+  <button class="menu-item" id="plus-mystickers">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+    <span>表情包</span>
+  </button>
+</div>
+
 <!-- 隐藏的本地文件输入（头像 / 背景 / 字卡） -->
 <input type="file" id="avatar-file" accept="image/*" hidden>
 <input type="file" id="avatar-me-file" accept="image/*" hidden>
@@ -1404,6 +1446,7 @@
 <input type="file" id="wc-text-file" accept=".txt,.md,text/plain" hidden>
 <input type="file" id="ringtone-file" accept="audio/*" multiple hidden>
 <input type="file" id="sticker-file" accept="image/*,image/gif" multiple hidden>
+<input type="file" id="mysticker-file" accept="image/*,image/gif" multiple hidden>
 
 <!-- ===================== 字卡导入预览 ===================== -->
 <div class="picker-overlay" id="wc-preview-overlay">
@@ -1454,10 +1497,22 @@
   </div>
 </div>
 
+<!-- ===================== 拍一拍自定义 ===================== -->
+<div class="picker-overlay" id="poke-custom-overlay">
+  <div class="picker-card">
+    <div class="picker-title">拍一拍</div>
+    <input type="text" class="wc-dialog-input" id="poke-custom-input" placeholder="自定义拍一拍内容" maxlength="30" autocomplete="off">
+    <div class="picker-actions">
+      <button class="wc-btn-cancel" id="poke-custom-cancel">取消</button>
+      <button class="wc-btn-confirm" id="poke-custom-confirm">确认</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== 备注修改 ===================== -->
 <div class="picker-overlay" id="rename-overlay">
   <div class="picker-card">
-    <div class="picker-title">设置备注</div>
+    <div class="picker-title" id="rename-title">设置备注</div>
     <input type="text" class="wc-dialog-input" id="rename-input" placeholder="输入新的名字" maxlength="20" autocomplete="off">
     <div class="picker-actions">
       <button class="wc-btn-cancel" id="rename-cancel">取消</button>
@@ -1579,7 +1634,7 @@
 (function () {
   "use strict";
 
-  var MY_NAME = "阿泽";
+  var myName = "阿泽";
   var MY_COLOR = "#3b82f6";
   var MY_STATUS = "在线";
   var myAvatarUrl = null;
@@ -1587,8 +1642,10 @@
   var pokeSeq = 1;
   var contactReplyCount = 1;   // 联系人回复条数（1~4）
   var contactReplyTime = 40;   // 联系人回复时间（秒）
-  var stickers = [];           // 上传的表情包 { id, url }
+  var stickers = [];           // 设置里的表情包（联系人使用） { id, url }
   var stickerSeq = 0;
+  var myStickers = [];         // 我专用的表情包 { id, url }
+  var myStickerSeq = 0;
 
   var STATUSES = ["在线", "离线", "忙碌", "离开一下", "工作中", "休息中", "学习中", "吃饭中", "散步中", "勿扰模式"];
 
@@ -1741,11 +1798,17 @@
   var pokeConfirm = document.getElementById("poke-confirm");
   var pokeToast = document.getElementById("poke-toast");
   var pokeToastCard = document.getElementById("poke-toast-card");
+  var pokeCustomOverlay = document.getElementById("poke-custom-overlay");
+  var pokeCustomInput = document.getElementById("poke-custom-input");
+  var pokeCustomCancel = document.getElementById("poke-custom-cancel");
+  var pokeCustomConfirm = document.getElementById("poke-custom-confirm");
 
   var renameOverlay = document.getElementById("rename-overlay");
   var renameInput = document.getElementById("rename-input");
   var renameCancel = document.getElementById("rename-cancel");
   var renameConfirm = document.getElementById("rename-confirm");
+  var renameTitle = document.getElementById("rename-title");
+  var renamingSelf = false;
 
   var menuReplyTime = document.getElementById("menu-reply-time");
   var menuReplyCount = document.getElementById("menu-reply-count");
@@ -1768,6 +1831,14 @@
   var soundVolumeInput = document.getElementById("sound-volume");
 
   var plusBtn = document.getElementById("plus-btn");
+  var plusPanel = document.getElementById("plus-panel");
+  var plusQuiz = document.getElementById("plus-quiz");
+  var plusMystickers = document.getElementById("plus-mystickers");
+  var viewMystickers = document.getElementById("view-mystickers");
+  var mystickersBack = document.getElementById("mystickers-back");
+  var mystickersUpload = document.getElementById("mystickers-upload");
+  var mystickersScroll = document.getElementById("mystickers-scroll");
+  var mystickerFile = document.getElementById("mysticker-file");
   var quizOverlay = document.getElementById("quiz-overlay");
   var quizBody = document.getElementById("quiz-body");
   var quizAdd = document.getElementById("quiz-add");
@@ -1828,14 +1899,14 @@
       el.style.background = "#d8dce2";
     } else {
       el.innerHTML = "";
-      el.textContent = initials(MY_NAME);
+      el.textContent = initials(myName);
       el.style.background = MY_COLOR;
     }
   }
   function myAvatarInner() {
     return myAvatarUrl
       ? '<img alt="" src="' + myAvatarUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block">'
-      : initials(MY_NAME);
+      : initials(myName);
   }
   function myAvatarBg() {
     return myAvatarUrl ? "#d8dce2" : MY_COLOR;
@@ -1861,7 +1932,7 @@
     pNameThem.textContent = contact.name;
     pAvatarMe.textContent = "";
     renderMyAvatar(pAvatarMe);
-    pNameMe.textContent = MY_NAME;
+    pNameMe.textContent = myName;
   }
 
   function refreshHeader() {
@@ -1869,7 +1940,7 @@
     hNameThem.textContent = contact.name;
     hAvatarMe.textContent = "";
     renderMyAvatar(hAvatarMe);
-    hNameMe.textContent = MY_NAME;
+    hNameMe.textContent = myName;
   }
 
   function refreshContactAppearance() {
@@ -1913,7 +1984,7 @@
   function renderPost(p) {
     var avatarChar = p.author === "me" ? myAvatarInner() : contactAvatarInner();
     var avatarBg = p.author === "me" ? myAvatarBg() : contactAvatarBg();
-    var iLiked = p.likes.indexOf(MY_NAME) !== -1;
+    var iLiked = p.likes.indexOf(myName) !== -1;
     var hasLikes = p.likes.length > 0;
     var hasComments = p.comments.length > 0;
     var interactions = '<div class="interactions' + ((hasLikes || hasComments) ? " has" : "") + '">';
@@ -1989,7 +2060,7 @@
     composeText.value = "";
     closeCompose();
     var id = ++postIdSeq;
-    posts.push({ id: id, author: "me", name: MY_NAME, color: MY_COLOR, text: text, ts: Date.now(), likes: [], comments: [] });
+    posts.push({ id: id, author: "me", name: myName, color: MY_COLOR, text: text, ts: Date.now(), likes: [], comments: [] });
     renderFeed();
     scheduleThemReact(id);
     persistState();
@@ -2020,8 +2091,8 @@
   function toggleLike(id) {
     var p = findPost(id);
     if (!p) return;
-    var i = p.likes.indexOf(MY_NAME);
-    if (i === -1) p.likes.push(MY_NAME);
+    var i = p.likes.indexOf(myName);
+    if (i === -1) p.likes.push(myName);
     else p.likes.splice(i, 1);
     renderFeed();
   }
@@ -2033,7 +2104,7 @@
     if (!text) return;
     var p = findPost(id);
     if (!p) return;
-    p.comments.push({ name: MY_NAME, color: MY_COLOR, text: text, ts: Date.now() });
+    p.comments.push({ name: myName, color: MY_COLOR, text: text, ts: Date.now() });
     activeCommentId = null;
     renderFeed();
     if (p.author === "them") scheduleThemReply(id);
@@ -2236,7 +2307,7 @@
   function renderQuoteRef(q) {
     var qm = findMessage(q.id);
     var raw = (qm && qm.revoked) ? "引用的消息已撤回" : (q.text != null ? q.text : "[问卷]");
-    var who = q.from === "me" ? MY_NAME : contact.name;
+    var who = q.from === "me" ? myName : contact.name;
     return '<div class="quote-ref">' + escapeHtml(who) + "：" + escapeHtml(raw) + "</div>";
   }
 
@@ -2319,7 +2390,7 @@
     renderMessages();
     overlay.style.display = "none";
     viewChat.classList.add("active");
-    [viewMoments, viewSettings, viewMessages, viewWordcards, viewRingtones, viewEmoticons, viewPokes].forEach(function (v) {
+    [viewMoments, viewSettings, viewMessages, viewWordcards, viewRingtones, viewEmoticons, viewPokes, viewMystickers].forEach(function (v) {
       v.classList.remove("active");
     });
     setTimeout(function () { messageInput.focus(); }, 60);
@@ -2472,13 +2543,19 @@
     pokeToastTimer = setTimeout(function () { pokeToast.classList.remove("show"); }, 800);
   }
 
-  function pokeThem() {
-    var content = randomPokeText();
-    showPokeToast("拍了拍" + contact.name + (content ? "的" + content : ""));
+  function pokeThem(content) {
+    var c = (content == null) ? "" : String(content);
+    showPokeToast("拍了拍" + contact.name + (c ? "的" + c : ""));
     setTimeout(function () {
-      pokeMessageFrom("me", content);
+      pokeMessageFrom("me", c);
       persistState();
     }, 800);
+  }
+
+  function openPokeCustom() {
+    pokeCustomInput.value = "";
+    pokeCustomOverlay.classList.add("show");
+    setTimeout(function () { pokeCustomInput.focus(); }, 60);
   }
 
   function pokeMe() {
@@ -2594,6 +2671,55 @@
     }
   }
 
+  // ===================== 我专用的表情包（加号面板入口） =====================
+  function renderMyStickers() {
+    if (myStickers.length === 0) {
+      mystickersScroll.innerHTML = '<div class="wc-empty">暂无表情包，点击右上角 + 导入图片或动图</div>';
+      return;
+    }
+    var html = '<div class="emo-grid">';
+    myStickers.forEach(function (s) {
+      html += '<div class="emo-cell" data-my-sticker="' + s.id + '"><img alt="表情" src="' + s.url + '"></div>';
+    });
+    html += '</div>';
+    mystickersScroll.innerHTML = html;
+  }
+
+  function addMyStickers(files) {
+    var list = Array.prototype.slice.call(files);
+    var i = 0;
+    function next() {
+      if (i >= list.length) {
+        mystickerFile.value = "";
+        renderMyStickers();
+        persistState();
+        return;
+      }
+      var f = list[i++];
+      readFileToDataUrl(f, function (dataUrl) {
+        myStickerSeq++;
+        myStickers.push({ id: "ms" + myStickerSeq, url: dataUrl });
+        next();
+      });
+    }
+    next();
+  }
+
+  function sendMyStickerById(id) {
+    for (var i = 0; i < myStickers.length; i++) {
+      if (myStickers[i].id === id) {
+        sendEmoticonAsMessage({ id: nextMsgId(), from: "me", image: myStickers[i].url, ts: Date.now() });
+        return;
+      }
+    }
+  }
+
+  function openMyStickers() {
+    renderMyStickers();
+    viewChat.classList.remove("active");
+    viewMystickers.classList.add("active");
+  }
+
   // ===================== 问卷 =====================
   var quizQuestions = [];
 
@@ -2639,6 +2765,7 @@
           html += '<button type="button" class="quiz-opt-del" data-qodel="' + i + '" data-oj="' + j + '">×</button></div>';
         });
         html += '<button type="button" class="quiz-opt-add" data-qoadd="' + i + '">＋ 添加选项</button></div>';
+        html += quizTimeRow(i, item);
       } else if (item.type === "fill") {
         html += '<div class="quiz-hint">填空题：对方填写一段文字作答</div>';
         html += quizTimeRow(i, item);
@@ -2697,7 +2824,20 @@
     if (m.questionnaire.questions.length === 0) m.questionnaire.answered = true;
   }
 
-  plusBtn.addEventListener("click", openQuiz);
+  plusBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    menuPop.classList.remove("show");
+    callMenu.classList.remove("show");
+    plusPanel.classList.toggle("show");
+  });
+  plusQuiz.addEventListener("click", function () {
+    plusPanel.classList.remove("show");
+    openQuiz();
+  });
+  plusMystickers.addEventListener("click", function () {
+    plusPanel.classList.remove("show");
+    openMyStickers();
+  });
   quizClose.addEventListener("click", closeQuiz);
   quizSend.addEventListener("click", sendQuiz);
   quizAdd.addEventListener("click", function () {
@@ -2847,7 +2987,7 @@
     var m = findMessage(msgMenuTargetId);
     if (!m) return;
     pendingQuote = m;
-    quoteBarText.textContent = (m.from === "me" ? MY_NAME : contact.name) + "：" +
+    quoteBarText.textContent = (m.from === "me" ? myName : contact.name) + "：" +
       (m.revoked ? "引用的消息已撤回" : (m.text != null ? m.text : "[问卷]"));
     quoteBar.classList.add("show");
     hideMsgMenu();
@@ -3097,6 +3237,18 @@
     return null;
   }
 
+  var defaultRingtoneTimer = null;
+  function startDefaultRingtone() {
+    stopDefaultRingtone();
+    var tone = [988, 784];
+    var play = function () { playTone(tone, 0.22, 0.13); };
+    play();
+    defaultRingtoneTimer = setInterval(play, 1600);
+  }
+  function stopDefaultRingtone() {
+    if (defaultRingtoneTimer) { clearInterval(defaultRingtoneTimer); defaultRingtoneTimer = null; }
+  }
+
   function startRingtone() {
     var a = getRingtoneAudio();
     a.pause();
@@ -3106,6 +3258,8 @@
       a.loop = true;
       var p = a.play();
       if (p && p.catch) p.catch(function () {});
+    } else {
+      startDefaultRingtone();
     }
   }
 
@@ -3113,19 +3267,13 @@
     var a = getRingtoneAudio();
     a.pause();
     a.currentTime = 0;
+    stopDefaultRingtone();
   }
 
-  function pickContactRingtone() {
-    if (ringtones.length === 0) { contactRingtoneId = null; return; }
-    contactRingtoneId = pick(ringtones).id;
+  function selectRingtone(id) {
+    contactRingtoneId = id;
     renderRingtones();
-  }
-
-  function scheduleContactRingtoneChange() {
-    setTimeout(function () {
-      pickContactRingtone();
-      scheduleContactRingtoneChange();
-    }, randomDelay(3600000, 28800000)); // 1~8 小时随机更换一次
+    persistState();
   }
 
   function renderRingtones() {
@@ -3141,7 +3289,7 @@
           '<div class="rt-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M18.36 5.64a9 9 0 0 1 0 12.72"/></svg></div>' +
           '<div class="rt-item-info">' +
             '<div class="rt-item-name">' + escapeHtml(r.name) + "</div>" +
-            (using ? '<div class="rt-item-tag">联系人正在使用</div>' : "") +
+            (using ? '<div class="rt-item-tag">已选为通话铃声</div>' : "") +
           "</div>" +
           '<button class="rt-item-del" data-del="' + r.id + '" aria-label="删除">' +
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>' +
@@ -3156,7 +3304,6 @@
     var i = 0;
     function next() {
       if (i >= list.length) {
-        if (ringtones.length > 0 && !currentRingtone()) pickContactRingtone();
         renderRingtones();
         persistState();
         ringtoneFile.value = "";
@@ -3176,7 +3323,7 @@
     for (var k = 0; k < ringtones.length; k++) if (ringtones[k].id === id) idx = k;
     if (idx < 0) return;
     ringtones.splice(idx, 1);
-    if (contactRingtoneId === id) pickContactRingtone();
+    if (contactRingtoneId === id) contactRingtoneId = null;
     renderRingtones();
     persistState();
   }
@@ -3295,6 +3442,7 @@
       var id = item.getAttribute("data-id");
       var r;
       for (var i = 0; i < ringtones.length; i++) if (ringtones[i].id === id) r = ringtones[i];
+      selectRingtone(id);
       if (r && r.url) {
         var a = new Audio(r.url);
         a.play().catch(function () {});
@@ -3367,7 +3515,7 @@
     if (Date.now() < suppressClickUntil) return;
     var av = e.target && e.target.closest ? e.target.closest(".msg-row.in .avatar") : null;
     if (!av) return;
-    pokeThem();
+    openPokeCustom();
   });
 
   // ===================== 拍一拍列表管理 =====================
@@ -3410,18 +3558,40 @@
     persistState();
   });
 
+  // ===================== 拍一拍自定义（双击头像弹窗） =====================
+  pokeCustomCancel.addEventListener("click", function () { pokeCustomOverlay.classList.remove("show"); });
+  pokeCustomConfirm.addEventListener("click", function () {
+    var content = pokeCustomInput.value.trim();
+    pokeCustomOverlay.classList.remove("show");
+    pokeThem(content);
+  });
+  pokeCustomInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); pokeCustomConfirm.click(); }
+  });
+  pokeCustomOverlay.addEventListener("click", function (e) {
+    if (e.target === pokeCustomOverlay) pokeCustomOverlay.classList.remove("show");
+  });
+
   // ===================== 备注修改 =====================
-  hNameThem.addEventListener("click", function () {
-    renameInput.value = contact.name;
+  function openRename(self) {
+    renamingSelf = self;
+    renameTitle.textContent = self ? "设置我的名字" : "设置备注";
+    renameInput.value = self ? myName : contact.name;
     renameOverlay.classList.add("show");
     setTimeout(function () { renameInput.focus(); renameInput.select(); }, 60);
-  });
+  }
+  hNameThem.addEventListener("click", function () { openRename(false); });
+  hNameMe.addEventListener("click", function () { openRename(true); });
   renameCancel.addEventListener("click", function () { renameOverlay.classList.remove("show"); });
   renameConfirm.addEventListener("click", function () {
     var name = renameInput.value.trim();
     renameOverlay.classList.remove("show");
     if (!name) return;
-    contact.name = name;
+    if (renamingSelf) {
+      myName = name;
+    } else {
+      contact.name = name;
+    }
     refreshHeader();
     initProfile();
     refreshContactAppearance();
@@ -3508,6 +3678,20 @@
     }
   });
 
+  // ===================== 我专用的表情包事件 =====================
+  mystickersBack.addEventListener("click", openChat);
+  mystickersUpload.addEventListener("click", function () { mystickerFile.click(); });
+  mystickerFile.addEventListener("change", function () {
+    if (mystickerFile.files && mystickerFile.files.length) addMyStickers(mystickerFile.files);
+  });
+  mystickersScroll.addEventListener("click", function (e) {
+    var cell = e.target && e.target.closest ? e.target.closest(".emo-cell") : null;
+    if (!cell) return;
+    if (cell.hasAttribute("data-my-sticker")) {
+      sendMyStickerById(cell.getAttribute("data-my-sticker"));
+    }
+  });
+
   // ===================== 消息音效音量（独立于手机媒体音量） =====================
   soundVolumeInput.addEventListener("input", function () {
     soundVolume = Math.max(0, Math.min(1, (+soundVolumeInput.value || 0) / 100));
@@ -3519,6 +3703,9 @@
     }
     if (callMenu.classList.contains("show")) {
       if (!callMenu.contains(e.target) && !btnCall.contains(e.target)) callMenu.classList.remove("show");
+    }
+    if (plusPanel.classList.contains("show")) {
+      if (!plusPanel.contains(e.target) && !plusBtn.contains(e.target)) plusPanel.classList.remove("show");
     }
   });
 
@@ -3903,6 +4090,7 @@
   function buildState() {
     return {
       myAvatarUrl: myAvatarUrl,
+      myName: myName,
       contact: {
         name: contact.name,
         color: contact.color,
@@ -3929,6 +4117,8 @@
       pokeSeq: pokeSeq,
       stickers: stickers,
       stickerSeq: stickerSeq,
+      myStickers: myStickers,
+      myStickerSeq: myStickerSeq,
       contactReplyCount: contactReplyCount,
       contactReplyTime: contactReplyTime
     };
@@ -3941,6 +4131,7 @@
     s.contact.chatBgImage = "";
     s.ringtones = [];
     s.contactRingtoneId = null;
+    s.myStickers = [];
     return s;
   }
 
@@ -3959,6 +4150,7 @@
   function applyState(s) {
     if (!s) return;
     if (typeof s.myAvatarUrl === "string") myAvatarUrl = s.myAvatarUrl;
+    if (typeof s.myName === "string") myName = s.myName;
     if (s.contact) {
       if (typeof s.contact.name === "string") contact.name = s.contact.name;
       if (typeof s.contact.color === "string") contact.color = s.contact.color;
@@ -3985,6 +4177,8 @@
     if (typeof s.pokeSeq === "number") pokeSeq = s.pokeSeq;
     if (Array.isArray(s.stickers)) stickers = s.stickers;
     if (typeof s.stickerSeq === "number") stickerSeq = s.stickerSeq;
+    if (Array.isArray(s.myStickers)) myStickers = s.myStickers;
+    if (typeof s.myStickerSeq === "number") myStickerSeq = s.myStickerSeq;
     if (typeof s.contactReplyCount === "number") contactReplyCount = s.contactReplyCount;
     if (typeof s.contactReplyTime === "number") contactReplyTime = s.contactReplyTime;
   }
@@ -4027,7 +4221,6 @@
     refreshHeader();
     applyChatBg();
     renderRingtones();
-    scheduleContactRingtoneChange();
     startMoments();
     scheduleStatusChange();
     scheduleIncomingCall();
