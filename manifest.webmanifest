@@ -1,0 +1,12 @@
+{
+  "name": "简约聊天",
+  "short_name": "聊天",
+  "description": "简约聊天应用",
+  "lang": "zh-CN",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "./chat-app.html",
+  "scope": "./",
+  "theme_color": "#3b82f6",
+  "background_color": "#ffffff"
+}

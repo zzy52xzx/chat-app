@@ -2,8 +2,14 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>简约聊天</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="简约聊天">
+<meta name="theme-color" content="#3b82f6">
+<link rel="manifest" href="manifest.webmanifest">
 <style>
   :root {
     --bg: #f7f8fa;
@@ -930,29 +936,60 @@
   #h-avatar-me { pointer-events: auto; cursor: pointer; }
   #h-avatar-me:active { opacity: 0.7; }
 
-  .pinyin-badge {
+  .pinyin-card {
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: top;
+  }
+  .pinyin-tag {
     display: inline-block;
     font-size: 10px;
     line-height: 1;
-    padding: 3px 6px;
-    margin: 2px 6px 2px 0;
+    padding: 3px 7px;
     border-radius: 4px;
     background: #f59e0b;
     color: #fff;
-    vertical-align: middle;
+    margin-bottom: 8px;
   }
-  .msg-row.out .pinyin-badge { background: rgba(255, 255, 255, 0.3); color: #fff; }
+  .msg-row.out .pinyin-tag { background: rgba(255, 255, 255, 0.3); color: #fff; }
 
-  .pinyin-text { display: inline; }
-  .pinyin-text ruby { display: ruby; }
-  .pinyin-text rt {
-    font-size: 9px;
-    line-height: 1.1;
-    color: #a0a5ac;
-    font-weight: 400;
-    margin-bottom: 2px;
+  .pinyin-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 3px;
+    align-items: flex-end;
   }
-  .msg-row.out .pinyin-text rt { color: rgba(255, 255, 255, 0.85); }
+  .pinyin-unit {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 20px;
+  }
+  .pinyin-py {
+    font-size: 11px;
+    line-height: 1.15;
+    color: #87909c;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+  .pinyin-dash {
+    width: 16px;
+    border-bottom: 1px dashed #b6bcc4;
+    margin: 3px 0 4px;
+  }
+  .pinyin-zi {
+    font-size: 16px;
+    line-height: 1.15;
+    font-weight: 500;
+  }
+  .pinyin-plain {
+    font-size: 15px;
+    line-height: 1.3;
+    align-self: flex-end;
+    white-space: pre;
+  }
+  .msg-row.out .pinyin-py { color: rgba(255, 255, 255, 0.85); }
+  .msg-row.out .pinyin-dash { border-bottom-color: rgba(255, 255, 255, 0.6); }
 
   .switch {
     position: relative;
@@ -1105,6 +1142,92 @@
     background: #fff; font-size: 18px; color: var(--text); cursor: pointer;
   }
   .rc-opt.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* ===================== 朋友圈铃铛与消息通知 ===================== */
+  #btn-moment-bell { position: relative; }
+  .icon-badge {
+    position: absolute; top: 1px; right: 1px;
+    min-width: 15px; height: 15px; padding: 0 4px;
+    background: #f43f5e; color: #fff; font-size: 10px; font-weight: 600;
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    line-height: 1; box-sizing: border-box; pointer-events: none;
+  }
+  .mom-notif-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.45); z-index: 700;
+    display: none; align-items: center; justify-content: center; padding: 18px;
+  }
+  .mom-notif-overlay.show { display: flex; }
+  .mom-notif-card {
+    width: 100%; max-width: 420px; height: 80%;
+    background: #fff; border-radius: 14px;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .mom-notif-head {
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; border-bottom: 1px solid var(--border);
+  }
+  .mom-notif-title { font-size: 16px; font-weight: 600; }
+  .mom-notif-back { border: none; background: transparent; font-size: 14px; color: var(--text-secondary); cursor: pointer; padding: 4px 6px; }
+  .mom-notif-spacer { width: 46px; }
+  .mom-notif-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 14px; -webkit-overflow-scrolling: touch; }
+  .mom-notif-empty { color: var(--text-secondary); font-size: 14px; text-align: center; padding: 40px 0; }
+  .mom-notif-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+  }
+  .mom-notif-item.unread { background: #fff4f5; }
+  .mom-notif-avatar {
+    width: 38px; height: 38px; border-radius: 50%; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 15px; font-weight: 600; overflow: hidden;
+  }
+  .mom-notif-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
+  .mom-notif-body { flex: 1 1 auto; min-width: 0; }
+  .mom-notif-text { font-size: 14px; color: var(--text); line-height: 1.4; word-break: break-word; }
+  .mom-notif-time { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+
+  /* 微信式消息弹窗（朋友圈通知） */
+  .mom-toast {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; gap: 12px;
+    padding: calc(var(--safe-top) + 10px) 16px 12px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12);
+    z-index: 800; transform: translateY(-110%); transition: transform 0.28s ease; cursor: pointer;
+  }
+  .mom-toast.show { transform: translateY(0); }
+  .mom-toast-avatar {
+    width: 40px; height: 40px; border-radius: 50%; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 16px; font-weight: 600; overflow: hidden;
+  }
+  .mom-toast-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
+  .mom-toast-body { flex: 1 1 auto; min-width: 0; }
+  .mom-toast-name { font-size: 15px; font-weight: 600; color: var(--text); }
+  .mom-toast-text { font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===================== 问卷历史记录 ===================== */
+  .quiz-head-left { display: flex; align-items: center; gap: 2px; }
+  .quiz-history-card {
+    width: 100%; max-width: 420px; height: 86%;
+    background: #fff; border-radius: 14px;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .quiz-history-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 14px; -webkit-overflow-scrolling: touch; }
+  .quiz-history-item { background: var(--bg); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+  .quiz-history-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .quiz-history-time { font-size: 12.5px; color: var(--text-secondary); }
+  .quiz-history-status { font-size: 12px; color: #22c55e; }
+  .quiz-history-status.pending { color: var(--text-secondary); }
+  .quiz-history-q { margin-top: 10px; font-size: 13.5px; }
+  .quiz-history-q-tag {
+    display: inline-block; font-size: 11px; color: #5b616a; background: #eef1f5;
+    padding: 1px 6px; border-radius: 4px; margin-right: 6px;
+  }
+  .quiz-history-q-title { font-weight: 600; }
+  .quiz-history-ans { margin-top: 4px; font-size: 12.5px; color: var(--text-secondary); padding-left: 2px; }
+  .quiz-head-btn.spacer { visibility: hidden; }
 </style>
 </head>
 <body>
@@ -1169,9 +1292,15 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <div class="title">朋友圈</div>
-      <button class="icon-btn right" id="btn-publish" aria-label="发表动态">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-      </button>
+      <div class="header-actions">
+        <button class="icon-btn" id="btn-moment-bell" aria-label="消息通知">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="icon-badge" id="moment-bell-badge" style="display:none"></span>
+        </button>
+        <button class="icon-btn" id="btn-publish" aria-label="发表动态">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
+      </div>
     </header>
     <div class="moments-scroll" id="moments-scroll"></div>
   </div>
@@ -1201,6 +1330,21 @@
           <span>表情包</span>
           <svg class="settings-row-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </button>
+      </div>
+      <div class="settings-section" style="margin-top:14px;">
+        <div class="settings-row">
+          <span>后台保活</span>
+          <div class="settings-switch-wrap" id="keepalive-switch-wrap">
+            <div class="switch" id="keepalive-switch" role="switch" aria-checked="false"></div>
+          </div>
+        </div>
+        <div class="settings-row">
+          <span>后台通知</span>
+          <div class="settings-switch-wrap" id="notify-switch-wrap">
+            <div class="switch" id="notify-switch" role="switch" aria-checked="false"></div>
+          </div>
+        </div>
+        <div class="wc-empty" style="text-align:left; padding-left:4px; margin-top:12px;">后台保活可尽量保持页面活跃；后台通知需授权浏览器通知权限，收到新消息或朋友圈互动时弹出系统通知</div>
       </div>
       <div class="settings-section" style="margin-top:14px;">
         <button class="settings-row" id="btn-export-data">
@@ -1393,16 +1537,50 @@
   </div>
 </div>
 
+<!-- ===================== 朋友圈消息通知 ===================== -->
+<div class="mom-toast" id="mom-toast">
+  <div class="mom-toast-avatar" id="mom-toast-avatar"></div>
+  <div class="mom-toast-body">
+    <div class="mom-toast-name" id="mom-toast-name"></div>
+    <div class="mom-toast-text" id="mom-toast-text"></div>
+  </div>
+</div>
+<div class="mom-notif-overlay" id="mom-notif-overlay">
+  <div class="mom-notif-card">
+    <div class="mom-notif-head">
+      <button class="mom-notif-back" id="mom-notif-back">返回</button>
+      <div class="mom-notif-title">消息通知</div>
+      <div class="mom-notif-spacer"></div>
+    </div>
+    <div class="mom-notif-list" id="mom-notif-list"></div>
+  </div>
+</div>
+
 <!-- ===================== 问卷编辑器 ===================== -->
 <div class="quiz-overlay" id="quiz-overlay">
   <div class="quiz-card">
     <div class="quiz-head">
-      <button class="quiz-head-btn" id="quiz-close">取消</button>
+      <div class="quiz-head-left">
+        <button class="quiz-head-btn" id="quiz-close">取消</button>
+        <button class="quiz-head-btn" id="quiz-history-open">历史</button>
+      </div>
       <div class="quiz-title">问卷</div>
       <button class="quiz-head-btn primary" id="quiz-send">发送</button>
     </div>
     <div class="quiz-body" id="quiz-body"></div>
     <button class="quiz-add" id="quiz-add">＋ 添加题目</button>
+  </div>
+</div>
+
+<!-- ===================== 问卷历史记录 ===================== -->
+<div class="quiz-overlay" id="quiz-history-overlay">
+  <div class="quiz-history-card">
+    <div class="quiz-head">
+      <button class="quiz-head-btn" id="quiz-history-back">返回</button>
+      <div class="quiz-title">问卷历史</div>
+      <button class="quiz-head-btn spacer" aria-hidden="true">返回</button>
+    </div>
+    <div class="quiz-history-body" id="quiz-history-body"></div>
   </div>
 </div>
 
@@ -1710,6 +1888,15 @@
   var composeText = document.getElementById("compose-text");
   var composeCancel = document.getElementById("compose-cancel");
   var composePublish = document.getElementById("compose-publish");
+  var btnMomentBell = document.getElementById("btn-moment-bell");
+  var momentBellBadge = document.getElementById("moment-bell-badge");
+  var momToast = document.getElementById("mom-toast");
+  var momToastAvatar = document.getElementById("mom-toast-avatar");
+  var momToastName = document.getElementById("mom-toast-name");
+  var momToastText = document.getElementById("mom-toast-text");
+  var momNotifOverlay = document.getElementById("mom-notif-overlay");
+  var momNotifList = document.getElementById("mom-notif-list");
+  var momNotifBack = document.getElementById("mom-notif-back");
 
   var hAvatarThem = document.getElementById("h-avatar-them");
   var hAvatarMe = document.getElementById("h-avatar-me");
@@ -1854,6 +2041,10 @@
   var stickerFile = document.getElementById("sticker-file");
 
   var soundVolumeInput = document.getElementById("sound-volume");
+  var keepAliveSwitch = document.getElementById("keepalive-switch");
+  var keepAliveSwitchWrap = document.getElementById("keepalive-switch-wrap");
+  var notifySwitch = document.getElementById("notify-switch");
+  var notifySwitchWrap = document.getElementById("notify-switch-wrap");
 
   var plusBtn = document.getElementById("plus-btn");
   var plusPanel = document.getElementById("plus-panel");
@@ -1872,6 +2063,10 @@
   var quizAdd = document.getElementById("quiz-add");
   var quizSend = document.getElementById("quiz-send");
   var quizClose = document.getElementById("quiz-close");
+  var quizHistoryOpen = document.getElementById("quiz-history-open");
+  var quizHistoryOverlay = document.getElementById("quiz-history-overlay");
+  var quizHistoryBody = document.getElementById("quiz-history-body");
+  var quizHistoryBack = document.getElementById("quiz-history-back");
 
   // ===== 通用工具 =====
   function initials(name) { return name.charAt(0); }
@@ -1985,6 +2180,8 @@
   var posts = [];
   var postIdSeq = 0;
   var activeCommentId = null;
+  var momentNotifs = [];     // { id, type:'like'|'comment'|'reply', text, ts, read }
+  var momentNotifSeq = 0;
 
   var THEM_POSTS = [
     "今天的天气真不错，出来走走",
@@ -2007,6 +2204,19 @@
       if (String(posts[i].id) === String(id)) return posts[i];
     }
     return null;
+  }
+
+  // 改名后同步朋友圈历史数据（动态作者名、点赞人、评论者名）
+  function momentsApplyRename(self, oldName, newName) {
+    posts.forEach(function (p) {
+      if ((p.author === "me") === self) p.name = newName;
+      for (var i = 0; i < p.likes.length; i++) {
+        if (p.likes[i] === oldName) p.likes[i] = newName;
+      }
+      p.comments.forEach(function (c) {
+        if (c.name === oldName) c.name = newName;
+      });
+    });
   }
 
   function renderPost(p) {
@@ -2100,8 +2310,11 @@
       if (!p) return;
       if (Math.random() < 0.5) {
         p.likes.push(contact.name);
+        pushMomentNotif("like", contact.name + " 赞了你的动态");
       } else {
-        p.comments.push({ name: contact.name, color: contact.color, text: pick(THEM_COMMENTS), ts: Date.now() });
+        var c = pick(THEM_COMMENTS);
+        p.comments.push({ name: contact.name, color: contact.color, text: c, ts: Date.now() });
+        pushMomentNotif("comment", contact.name + " 评论了你的动态：" + c);
       }
       renderFeed();
     }, randomDelay(1500, 6000));
@@ -2111,9 +2324,76 @@
     setTimeout(function () {
       var p = findPost(postId);
       if (!p) return;
-      p.comments.push({ name: contact.name, color: contact.color, text: pick(THEM_REPLIES), ts: Date.now() });
+      var c = pick(THEM_REPLIES);
+      p.comments.push({ name: contact.name, color: contact.color, text: c, ts: Date.now() });
+      pushMomentNotif("reply", contact.name + " 回复了你的评论：" + c);
       renderFeed();
     }, randomDelay(2000, 180000));
+  }
+
+  // ===================== 朋友圈消息通知 =====================
+  function nextMomNotifId() { momentNotifSeq++; return "n" + momentNotifSeq; }
+
+  function pushMomentNotif(type, text) {
+    momentNotifs.push({ id: nextMomNotifId(), type: type, text: text, ts: Date.now(), read: false });
+    renderMomentBadge();
+    showMomToast(contact.name, text);
+    systemNotify("朋友圈消息", contact.name + "：" + text);
+    persistState();
+  }
+
+  function renderMomentBadge() {
+    var unread = 0;
+    momentNotifs.forEach(function (n) { if (!n.read) unread++; });
+    if (unread > 0) {
+      momentBellBadge.style.display = "flex";
+      momentBellBadge.textContent = unread > 99 ? "99+" : String(unread);
+    } else {
+      momentBellBadge.style.display = "none";
+    }
+  }
+
+  var momToastTimer = null;
+  function showMomToast(name, text) {
+    momToastAvatar.style.background = contactAvatarBg();
+    momToastAvatar.innerHTML = contactAvatarInner();
+    momToastName.textContent = name;
+    momToastText.textContent = text;
+    momToast.classList.add("show");
+    clearTimeout(momToastTimer);
+    momToastTimer = setTimeout(function () { momToast.classList.remove("show"); }, 4000);
+  }
+
+  function renderMomentNotifs() {
+    if (momentNotifs.length === 0) {
+      momNotifList.innerHTML = '<div class="mom-notif-empty">暂无消息通知</div>';
+      return;
+    }
+    var sorted = momentNotifs.slice().sort(function (a, b) { return b.ts - a.ts; });
+    var html = "";
+    sorted.forEach(function (n) {
+      html += '<div class="mom-notif-item' + (n.read ? "" : " unread") + '" data-id="' + n.id + '">' +
+        '<div class="mom-notif-avatar" style="background:' + contactAvatarBg() + '">' + contactAvatarInner() + "</div>" +
+        '<div class="mom-notif-body">' +
+          '<div class="mom-notif-text">' + escapeHtml(n.text) + "</div>" +
+          '<div class="mom-notif-time">' + formatTime(n.ts) + "</div>" +
+        "</div></div>";
+    });
+    momNotifList.innerHTML = html;
+  }
+
+  function markMomentNotifsRead() {
+    var changed = false;
+    momentNotifs.forEach(function (n) { if (!n.read) { n.read = true; changed = true; } });
+    if (changed) { renderMomentBadge(); persistState(); }
+  }
+
+  function openMomentNotifs() {
+    renderMomentNotifs();
+    momNotifOverlay.classList.add("show");
+  }
+  function closeMomentNotifs() {
+    momNotifOverlay.classList.remove("show");
   }
 
   function toggleLike(id) {
@@ -2243,15 +2523,90 @@
     return s;
   }
 
-  // 将文本渲染为 ruby 上标拼音；仅已收录的字显示拼音
+  // 汉字声调表（1~4 声，0 表示轻声不标注符号）
+  var TONE_MAP = {
+    "你":3,"好":3,"谢":4,"再":4,"见":4,"对":4,"不":4,"起":3,
+    "没":2,"关":1,"系":4,"请":3,"稍":1,"等":3,"早":3,"安":1,"晚":3,
+    "的":0,"一":1,"是":4,"了":0,"我":3,"有":3,"和":2,"就":4,
+    "这":4,"个":4,"们":0,"他":1,"她":1,"它":1,"在":4,"人":2,
+    "大":4,"小":3,"上":4,"下":4,"中":1,"国":2,"家":1,"天":1,"地":4,
+    "时":2,"日":4,"月":4,"年":2,"今":1,"明":2,"昨":2,"现":4,
+    "多":1,"少":3,"几":3,"每":3,"又":4,"才":2,"刚":1,"已":3,"经":1,
+    "知":1,"道":4,"得":2,"应":1,"该":1,"能":2,"会":4,"要":4,"想":3,
+    "为":4,"因":1,"所":3,"以":3,"可":3,"此":3,"然":2,"后":4,"于":2,"之":1,
+    "其":2,"与":3,"及":2,"由":2,"自":4,"只":3,"向":4,"往":3,"常":2,
+    "但":4,"而":2,"且":3,"或":4,"还":2,"也":3,"都":1,"很":3,"太":4,
+    "更":4,"最":4,"真":1,"什":2,"么":0,"问":4,"呀":0,"啊":0,"吧":0,
+    "呢":0,"吗":0,"恩":1,"心":1,"爱":4,"喜":3,"欢":1,"开":1,"说":1,
+    "话":4,"看":4,"听":1,"走":3,"来":2,"去":4,"回":2,"吃":1,"喝":1,
+    "睡":4,"觉":2,"工":1,"作":4,"学":2,"习":2,"生":1,"活":2,
+    "朋":2,"友":3,"老":3,"师":1,"同":2,"长":2,"哥":1,"姐":3,
+    "弟":4,"妹":4,"爸":4,"妈":1,"爷":2,"奶":3,"男":2,"女":3,"孩":2,
+    "子":0,"高":1,"兴":4,"快":4,"乐":4,"给":3,"把":3,"被":4,"让":4,
+    "从":2,"到":4,"做":4,"东":1,"西":1,"南":2,"北":3,"左":3,"右":4,
+    "前":2,"里":3,"外":4,"面":4,"边":1,"处":4,"方":1,"白":2,"黑":1,
+    "红":2,"蓝":2,"绿":4,"青":1,"黄":2,"春":1,"夏":4,"秋":1,"冬":1,
+    "风":1,"雨":3,"雪":3,"云":2,"山":1,"水":3,"花":1,"草":3,"树":4,
+    "木":4,"鸟":3,"鱼":2,"猫":1,"狗":3,"牛":2,"马":3,"猪":1,"羊":2,
+    "鸡":1,"鸭":1,"米":3,"饭":4,"菜":4,"茶":2,"果":3,"车":1,"门":2,
+    "房":2,"屋":1,"床":2,"桌":1,"椅":3,"手":3,"脚":3,"头":2,"眼":3,
+    "耳":3,"口":3,"鼻":2,"身":1,"体":3,"脸":3,"嘴":3,"笑":4,"哭":1,
+    "疼":2,"冷":3,"热":4,"温":1,"暖":3,"凉":2,"新":1,"旧":4,"坏":4,
+    "美":3,"丑":3,"胖":4,"瘦":4,"忙":2,"闲":2,"累":4,"困":4,"饿":4,
+    "饱":3,"买":3,"卖":4,"拿":2,"放":4,"找":3,"丢":1,"送":4,"收":1,
+    "写":3,"读":2,"画":4,"唱":4,"跳":4,"跑":3,"坐":4,"站":4,"打":3,
+    "接":1,"挂":4,"发":1,"聊":2,"玩":2,"停":2,"进":4,"出":1
+  };
+
+  // 给无音调拼音标注声调符号（a/e/o 优先，其次最后一个元音 i/u/ü）
+  function applyTone(py, tone) {
+    if (!py || !tone || tone === 0 || tone === 5) return py;
+    var marks = {
+      a: ["ā", "á", "ǎ", "à"],
+      e: ["ē", "é", "ě", "è"],
+      o: ["ō", "ó", "ǒ", "ò"],
+      i: ["ī", "í", "ǐ", "ì"],
+      u: ["ū", "ú", "ǔ", "ù"],
+      v: ["ǖ", "ǘ", "ǚ", "ǜ"]
+    };
+    var ti = tone - 1;
+    var key = null, idx = -1;
+    var order = ["a", "e", "o"];
+    for (var k = 0; k < order.length; k++) {
+      var p = py.indexOf(order[k]);
+      if (p !== -1) { key = order[k]; idx = p; break; }
+    }
+    if (key === null) {
+      for (var j = py.length - 1; j >= 0; j--) {
+        var c = py.charAt(j);
+        if (c === "i" || c === "u" || c === "v") { key = c; idx = j; break; }
+      }
+    }
+    if (key === null) return py;
+    return py.slice(0, idx) + marks[key][ti] + py.slice(idx + 1);
+  }
+
+  function tonePinyin(ch) {
+    var py = PINYIN_MAP[ch];
+    if (!py) return null;
+    return applyTone(py, TONE_MAP[ch]);
+  }
+
+  // 将文本渲染为竖排注音字卡（拼音音标在上、虚线在中、汉字在下）
   function renderPinyinText(text) {
     var out = "";
     for (var i = 0; i < text.length; i++) {
       var ch = text.charAt(i);
-      var py = PINYIN_MAP[ch];
-      out += py
-        ? '<ruby>' + escapeHtml(ch) + '<rt>' + escapeHtml(py) + '</rt></ruby>'
-        : escapeHtml(ch);
+      var py = tonePinyin(ch);
+      if (py) {
+        out += '<span class="pinyin-unit">' +
+          '<span class="pinyin-py">' + escapeHtml(py) + "</span>" +
+          '<span class="pinyin-dash"></span>' +
+          '<span class="pinyin-zi">' + escapeHtml(ch) + "</span>" +
+          "</span>";
+      } else if (ch.trim()) {
+        out += '<span class="pinyin-plain">' + escapeHtml(ch) + "</span>";
+      }
     }
     return out;
   }
@@ -2260,6 +2615,8 @@
   var soundOn = true;       // 接收消息音效
   var sendSoundOn = true;   // 发送消息音效
   var soundVolume = 1;      // 消息音效音量（0~1，独立于手机媒体音量）
+  var keepAliveOn = true;   // 后台保活
+  var notificationOn = false; // 后台通知
   var audioCtx = null;
 
   function ensureAudioCtx() {
@@ -2292,6 +2649,7 @@
 
   function playReceiveSound() {
     if (!soundOn) return;
+    if (activeCall) return; // 通话中不播放消息提示音，避免后台持续响起
     playTone([880, 1318.51], 0.28, 0.11);
   }
   function playSendSound() {
@@ -2319,6 +2677,82 @@
     updateSoundSwitches();
     try { localStorage.setItem("chat_send_sound_on", sendSoundOn ? "1" : "0"); } catch (e) {}
     if (sendSoundOn) playSendSound();
+  }
+
+  // ===================== 后台通知 / 后台保活 =====================
+  function systemNotify(title, body) {
+    if (!notificationOn) return;
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    try {
+      var n = new Notification(title, { body: body || "" });
+      n.onclick = function () { n.close(); window.focus(); };
+      setTimeout(function () { n.close(); }, 5000);
+    } catch (e) {}
+  }
+
+  function updateBgSwitches() {
+    updateSwitchEl(keepAliveSwitch, keepAliveOn);
+    updateSwitchEl(notifySwitch, notificationOn);
+  }
+
+  function requestNotificationPermission(cb) {
+    if (!("Notification" in window)) { cb(false); return; }
+    if (Notification.permission === "granted") { cb(true); return; }
+    if (Notification.permission === "denied") { cb(false); return; }
+    var done = false;
+    function settle(ok) { if (!done) { done = true; cb(ok); } }
+    try {
+      var r = Notification.requestPermission(function (perm) { settle(perm === "granted"); });
+      if (r && typeof r.then === "function") r.then(function (perm) { settle(perm === "granted"); });
+    } catch (e) { settle(false); }
+  }
+
+  function toggleNotification() {
+    if (!notificationOn) {
+      requestNotificationPermission(function (ok) {
+        if (ok) {
+          notificationOn = true;
+        } else {
+          notificationOn = false;
+          alert("未授予通知权限，无法开启后台通知");
+        }
+        updateBgSwitches();
+        persistState();
+      });
+      return;
+    }
+    notificationOn = false;
+    updateBgSwitches();
+    persistState();
+  }
+
+  var wakeLockSentinel = null;
+  function acquireWakeLock() {
+    if (!keepAliveOn) return;
+    if (!navigator.wakeLock || !navigator.wakeLock.request) return;
+    navigator.wakeLock.request("screen").then(function (sentinel) {
+      wakeLockSentinel = sentinel;
+      sentinel.addEventListener("release", function () { wakeLockSentinel = null; });
+    }).catch(function () { wakeLockSentinel = null; });
+  }
+  function releaseWakeLock() {
+    if (wakeLockSentinel) {
+      try { wakeLockSentinel.release(); } catch (e) {}
+      wakeLockSentinel = null;
+    }
+  }
+  function toggleKeepAlive() {
+    keepAliveOn = !keepAliveOn;
+    updateBgSwitches();
+    if (keepAliveOn) acquireWakeLock(); else releaseWakeLock();
+    persistState();
+  }
+  function initKeepAlive() {
+    updateBgSwitches();
+    acquireWakeLock();
+    document.addEventListener("visibilitychange", function () {
+      if (keepAliveOn && document.visibilityState === "visible") acquireWakeLock();
+    });
   }
 
   var msgSeq = 0;
@@ -2391,9 +2825,10 @@
         bodyHtml = renderQuizMessage(m.questionnaire);
       } else {
         var quoteHtml = m.quote ? renderQuoteRef(m.quote) : "";
-        var badgeHtml = m.isPinyin ? '<span class="pinyin-badge">拼音</span>' : "";
-        var textHtml = m.isPinyin ? '<span class="pinyin-text">' + renderPinyinText(m.text) + "</span>" : escapeHtml(m.text);
-        bodyHtml = badgeHtml + quoteHtml + textHtml;
+        var textHtml = m.isPinyin
+          ? '<div class="pinyin-card"><div class="pinyin-tag">拼音</div><div class="pinyin-list">' + renderPinyinText(m.text) + "</div></div>"
+          : escapeHtml(m.text);
+        bodyHtml = quoteHtml + textHtml;
       }
       html +=
         '<div class="msg-row ' + cls + '" data-id="' + m.id + '">' +
@@ -2544,6 +2979,16 @@
     }, delay);
   }
 
+  // 未发消息前不启动任何自动交互（来电/主动消息/拍一拍），避免空闲时出现奇怪音效
+  var autoInteractionsStarted = false;
+  function startAutoInteractions() {
+    if (autoInteractionsStarted) return;
+    autoInteractionsStarted = true;
+    scheduleIncomingCall();
+    scheduleProactiveMessage();
+    scheduleThemPoke();
+  }
+
   // ===================== 拍一拍 =====================
   function randomPokeText() {
     var pool = pokeItems.filter(function (p) { return p.text && p.text.trim(); });
@@ -2685,6 +3130,7 @@
     contact.messages.push(msg);
     renderMessages();
     playSendSound();
+    startAutoInteractions();
     scheduleThemReplies();
     scheduleProactiveMessage();
     persistState();
@@ -2771,6 +3217,34 @@
   }
   function closeQuiz() { quizOverlay.classList.remove("show"); }
 
+  // 问卷历史记录：查看所有发出去过的问卷及其回答
+  function renderQuizHistory() {
+    var items = contact.messages.filter(function (m) { return m.questionnaire; });
+    if (items.length === 0) {
+      quizHistoryBody.innerHTML = '<div class="mom-notif-empty">暂无已发送的问卷</div>';
+      return;
+    }
+    var sorted = items.slice().reverse();
+    var html = "";
+    sorted.forEach(function (m) {
+      var qq = m.questionnaire;
+      var answered = !!qq.answered;
+      html += '<div class="quiz-history-item">';
+      html += '<div class="quiz-history-head"><span class="quiz-history-time">' + formatTime(m.ts) + "</span>" +
+        '<span class="quiz-history-status' + (answered ? "" : " pending") + '">' + (answered ? "已回答" : "待回答") + "</span></div>";
+      qq.questions.forEach(function (item) {
+        var tag = item.type === "choice" ? "选择" : (item.type === "fill" ? "填空" : "是否");
+        html += '<div class="quiz-history-q"><span class="quiz-history-q-tag">' + tag + "</span>" +
+          '<span class="quiz-history-q-title">' + escapeHtml(item.q) + "</span></div>";
+        html += '<div class="quiz-history-ans">' +
+          (item.answer != null && item.answer !== "" ? "答：" + escapeHtml(item.answer) : "（未作答）") +
+          "</div>";
+      });
+      html += "</div>";
+    });
+    quizHistoryBody.innerHTML = html;
+  }
+
   function quizTypeBtn(i, type, label) {
     return '<button type="button" class="qt-btn' + (quizQuestions[i].type === type ? " active" : "") +
       '" data-qtype="' + i + '" data-type="' + type + '">' + label + "</button>";
@@ -2819,6 +3293,7 @@
     closeQuiz();
     renderMessages();
     playSendSound();
+    startAutoInteractions();
     scheduleThemAnswerQuiz(msg.id);
     scheduleProactiveMessage();
     persistState();
@@ -2875,6 +3350,16 @@
   });
   quizOverlay.addEventListener("click", function (e) {
     if (e.target === quizOverlay) closeQuiz();
+  });
+  quizHistoryOpen.addEventListener("click", function () {
+    renderQuizHistory();
+    quizHistoryOverlay.classList.add("show");
+  });
+  quizHistoryBack.addEventListener("click", function () {
+    quizHistoryOverlay.classList.remove("show");
+  });
+  quizHistoryOverlay.addEventListener("click", function (e) {
+    if (e.target === quizHistoryOverlay) quizHistoryOverlay.classList.remove("show");
   });
 
   quizBody.addEventListener("input", function (e) {
@@ -2952,6 +3437,7 @@
     messageInput.value = "";
     renderMessages();
     playSendSound();
+    startAutoInteractions();
     scheduleThemReplies();
     scheduleProactiveMessage();
     persistState();
@@ -3449,6 +3935,8 @@
   });
   soundSwitchWrap.closest(".settings-row").addEventListener("click", toggleReceiveSound);
   sendSoundSwitchWrap.closest(".settings-row").addEventListener("click", toggleSendSound);
+  keepAliveSwitchWrap.closest(".settings-row").addEventListener("click", toggleKeepAlive);
+  notifySwitchWrap.closest(".settings-row").addEventListener("click", toggleNotification);
   btnRingtones.addEventListener("click", function () {
     viewMessages.classList.remove("active");
     viewRingtones.classList.add("active");
@@ -3502,6 +3990,21 @@
     if (e.target === composeOverlay) closeCompose();
   });
   momentsScrollEl.addEventListener("click", onMomentClick);
+
+  btnMomentBell.addEventListener("click", function () {
+    markMomentNotifsRead();
+    openMomentNotifs();
+  });
+  momNotifBack.addEventListener("click", closeMomentNotifs);
+  momNotifOverlay.addEventListener("click", function (e) {
+    if (e.target === momNotifOverlay) closeMomentNotifs();
+  });
+  momToast.addEventListener("click", function () {
+    momToast.classList.remove("show");
+    markMomentNotifsRead();
+    openMoments();
+    openMomentNotifs();
+  });
 
   // 通话相关按钮
   btnCall.addEventListener("click", function (e) {
@@ -3615,14 +4118,17 @@
     var name = renameInput.value.trim();
     renameOverlay.classList.remove("show");
     if (!name) return;
+    var oldName = renamingSelf ? myName : contact.name;
     if (renamingSelf) {
       myName = name;
     } else {
       contact.name = name;
     }
+    momentsApplyRename(renamingSelf, oldName, name);
     refreshHeader();
     initProfile();
     refreshContactAppearance();
+    renderMessages();
     persistState();
   });
   renameInput.addEventListener("keydown", function (e) {
@@ -4150,6 +4656,8 @@
       },
       posts: posts,
       postIdSeq: postIdSeq,
+      momentNotifs: momentNotifs,
+      momentNotifSeq: momentNotifSeq,
       cards: cards,
       cardSeq: cardSeq,
       groups: groups,
@@ -4161,6 +4669,8 @@
       soundOn: soundOn,
       sendSoundOn: sendSoundOn,
       soundVolume: soundVolume,
+      keepAliveOn: keepAliveOn,
+      notificationOn: notificationOn,
       pokeItems: pokeItems,
       pokeSeq: pokeSeq,
       stickers: stickers,
@@ -4210,6 +4720,8 @@
     }
     if (Array.isArray(s.posts)) posts = s.posts;
     if (typeof s.postIdSeq === "number") postIdSeq = s.postIdSeq;
+    if (Array.isArray(s.momentNotifs)) momentNotifs = s.momentNotifs;
+    if (typeof s.momentNotifSeq === "number") momentNotifSeq = s.momentNotifSeq;
     if (Array.isArray(s.cards)) cards = s.cards;
     if (typeof s.cardSeq === "number") cardSeq = s.cardSeq;
     if (Array.isArray(s.groups)) groups = s.groups;
@@ -4221,6 +4733,8 @@
     if (typeof s.soundOn === "boolean") soundOn = s.soundOn;
     if (typeof s.sendSoundOn === "boolean") sendSoundOn = s.sendSoundOn;
     if (typeof s.soundVolume === "number") soundVolume = s.soundVolume;
+    if (typeof s.keepAliveOn === "boolean") keepAliveOn = s.keepAliveOn;
+    if (typeof s.notificationOn === "boolean") notificationOn = s.notificationOn;
     if (Array.isArray(s.pokeItems)) pokeItems = s.pokeItems;
     if (typeof s.pokeSeq === "number") pokeSeq = s.pokeSeq;
     if (Array.isArray(s.stickers)) stickers = s.stickers;
@@ -4305,11 +4819,10 @@
     refreshHeader();
     applyChatBg();
     renderRingtones();
+    renderMomentBadge();
     startMoments();
     scheduleStatusChange();
-    scheduleIncomingCall();
-    scheduleProactiveMessage();
-    scheduleThemPoke();
+    initKeepAlive();
   }
   restoreState(boot);
 })();
