@@ -787,6 +787,14 @@
     width: 100%; height: 140px; resize: none; border: 1px solid var(--border);
     border-radius: 8px; padding: 10px; font-size: 14px; outline: none; color: var(--text); font-family: inherit;
   }
+  .wc-add-group-row {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .wc-add-group-label { font-size: 14px; color: var(--text); flex: 0 0 auto; }
+  .wc-dialog-select {
+    flex: 1 1 auto; height: 40px; border: 1px solid var(--border); border-radius: 8px;
+    padding: 0 10px; font-size: 14px; outline: none; color: var(--text); background: #fff;
+  }
   .wc-move-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; }
 
   /* 批量管理底栏 */
@@ -1478,6 +1486,10 @@
   <div class="picker-card">
     <div class="picker-title">添加字卡</div>
     <textarea class="wc-dialog-textarea" id="wc-add-text" placeholder="一行一个字卡"></textarea>
+    <div class="wc-add-group-row">
+      <span class="wc-add-group-label">添加到分组</span>
+      <select class="wc-dialog-select" id="wc-add-group"></select>
+    </div>
     <div class="picker-actions">
       <button class="wc-btn-cancel" id="wc-add-cancel">取消</button>
       <button class="wc-btn-confirm" id="wc-add-confirm">添加</button>
@@ -1750,6 +1762,7 @@
   var wcAddText = document.getElementById("wc-add-text");
   var wcAddCancel = document.getElementById("wc-add-cancel");
   var wcAddConfirm = document.getElementById("wc-add-confirm");
+  var wcAddGroup = document.getElementById("wc-add-group");
   var wcGroupOverlay = document.getElementById("wc-group-overlay");
   var wcGroupNameInput = document.getElementById("wc-group-name");
   var wcGroupCancel = document.getElementById("wc-group-cancel");
@@ -3910,17 +3923,27 @@
   }
 
   // 添加字卡
+  function renderAddGroupOptions() {
+    var html = '<option value="__none__">未分组</option>';
+    groups.forEach(function (g) {
+      html += '<option value="' + g.id + '">' + escapeHtml(g.name) + '</option>';
+    });
+    wcAddGroup.innerHTML = html;
+  }
   wcAddBtn.addEventListener("click", function () {
     wcAddText.value = "";
+    renderAddGroupOptions();
+    wcAddGroup.value = "__none__";
     wcAddOverlay.classList.add("show");
     setTimeout(function () { wcAddText.focus(); }, 50);
   });
   wcAddCancel.addEventListener("click", function () { wcAddOverlay.classList.remove("show"); });
   wcAddConfirm.addEventListener("click", function () {
     var lines = parseLines(wcAddText.value);
-    wcAddOverlay.classList.remove("show");
     if (lines.length === 0) { alert("请输入字卡，一行一个"); return; }
-    lines.forEach(function (t) { cards.push(buildCard(t, null)); });
+    wcAddOverlay.classList.remove("show");
+    var target = (wcAddGroup.value && wcAddGroup.value !== "__none__") ? wcAddGroup.value : null;
+    lines.forEach(function (t) { cards.push(buildCard(t, target)); });
     setBatchMode(false);
   });
 
